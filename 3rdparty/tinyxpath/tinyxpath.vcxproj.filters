@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{e0abb43b-8333-4357-8a0a-bbfe8ec5d0c7}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;rc;def;r;odl;idl;hpj;bat</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{8a865bcf-0a75-4a46-9dbd-871d56b42501}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="htmlutil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Authors" />
+    <None Include="ChangeLog" />
+    <None Include="configure.in" />
+    <None Include="Makefile.configure" />
+    <None Include="News" />
+    <None Include="Readme" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="openoff.xml" />
+    <Xml Include="rss2_projnews.xml" />
+    <Xml Include="test.xml" />
+  </ItemGroup>
+</Project>

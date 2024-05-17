@@ -1,0 +1,56 @@
+﻿C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.Cpp.Analysis.props(24,5): warning MSB4211: The property "MsvcAnalysisPluginPath" is being set to a value for the first time, but it was already consumed at "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CodeAnalysis.Extensions.props (33,5)".
+  action_store.cpp
+  lex_util.cpp
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_util.cpp(222,4): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_util.cpp(232,4): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  node_set.cpp
+  tinystr.cpp
+  tinyxml.cpp
+  tinyxmlerror.cpp
+  tinyxmlparser.cpp
+  tokenlist.cpp
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_token.h(120,7): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../tokenlist.cpp')
+  
+  xml_util.cpp
+  xpath_expression.cpp
+  xpath_processor.cpp
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_token.h(120,7): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_processor.cpp')
+  
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\xpath_syntax.h(48,10): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_processor.cpp')
+  
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\xpath_processor.cpp(1693,13): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  xpath_stack.cpp
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_token.h(120,7): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_stack.cpp')
+  
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\xpath_syntax.h(48,10): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_stack.cpp')
+  
+  xpath_static.cpp
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_token.h(120,7): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_static.cpp')
+  
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\xpath_syntax.h(48,10): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_static.cpp')
+  
+  xpath_stream.cpp
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_token.h(120,7): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_stream.cpp')
+  
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\xpath_syntax.h(48,10): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_stream.cpp')
+  
+  xpath_syntax.cpp
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\lex_token.h(120,7): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_syntax.cpp')
+  
+C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\xpath_syntax.h(48,10): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../xpath_syntax.cpp')
+  
+  Generating Code...
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1554,5): warning MSB8012: TargetPath(C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\tinyxpath_lib\Debug\tinyxpath_lib.lib) does not match the Library's OutputFile property value (C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\tinyxpath_lib\Debug\tinyxpathd.lib). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Lib.OutputFile).
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1556,5): warning MSB8012: TargetName(tinyxpath_lib) does not match the Library's OutputFile property value (tinyxpathd). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Lib.OutputFile).
+  tinyxpath_lib.vcxproj -> C:\caiiiycuk\kdlab\perimeter-map-compiler\3rdparty\tinyxpath\tinyxpath_lib\Debug\tinyxpath_lib.lib

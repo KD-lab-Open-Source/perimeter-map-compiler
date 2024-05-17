@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34616.47
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tinyxpath", "tinyxpath.vcxproj", "{D1A80430-789A-4D61-B650-98BB36781D28}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tinyxpath_lib", "tinyxpath_lib\tinyxpath_lib.vcxproj", "{3E86FCD1-9FCB-4C8F-BFA9-298B18F277FB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D1A80430-789A-4D61-B650-98BB36781D28}.Debug|x86.ActiveCfg = Debug|Win32
+		{D1A80430-789A-4D61-B650-98BB36781D28}.Debug|x86.Build.0 = Debug|Win32
+		{D1A80430-789A-4D61-B650-98BB36781D28}.Release|x86.ActiveCfg = Release|Win32
+		{D1A80430-789A-4D61-B650-98BB36781D28}.Release|x86.Build.0 = Release|Win32
+		{3E86FCD1-9FCB-4C8F-BFA9-298B18F277FB}.Debug|x86.ActiveCfg = Debug|Win32
+		{3E86FCD1-9FCB-4C8F-BFA9-298B18F277FB}.Debug|x86.Build.0 = Debug|Win32
+		{3E86FCD1-9FCB-4C8F-BFA9-298B18F277FB}.Release|x86.ActiveCfg = Release|Win32
+		{3E86FCD1-9FCB-4C8F-BFA9-298B18F277FB}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1564C809-DF94-4FAB-BEDE-7B0B410AE6AB}
+	EndGlobalSection
+EndGlobal
