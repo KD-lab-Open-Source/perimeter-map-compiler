@@ -34,7 +34,7 @@
 #include "panel wnd.h"
 
 #pragma warning(push, 1)
-#include <HTMLLayout/htmlayout.h>
+#include "..\..\3rdparty\htmlayout\htmlayout.h"
 #pragma warning(pop)
 
 class PreviewWnd;

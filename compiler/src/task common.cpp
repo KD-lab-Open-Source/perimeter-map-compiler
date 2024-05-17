@@ -1339,7 +1339,8 @@ namespace TaskCommon
 			// cartesian components of an index
 			short xi, yi;
 			// iterate through the hierarchy
-			for (int k(n - 2); k != 0; --k)
+			int k(n - 2);
+			for (; k != 0; --k)
 			{
 				num = static_cast<short>(exp2(n - k - 1));
 				short side(static_cast<short>(exp2(k + 1))); // length of the region's side

@@ -408,7 +408,7 @@ VersionDetector::Chooser::Chooser(const VersionDetector::Chooser::entries_t &ent
 	:entries_(entries)
 {}
 
-VersionDetector::Chooser::DoModal(HWND parent_wnd)
+INT_PTR VersionDetector::Chooser::DoModal(HWND parent_wnd)
 {
 	// run dialog
 	return DialogBoxParam(

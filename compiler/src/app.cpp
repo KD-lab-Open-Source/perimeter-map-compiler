@@ -90,12 +90,11 @@ bool App::Initialize(HINSTANCE instance, LPCTSTR cmd_line)
 	}
 	// add the panels to the main window
 	{
-		using MainWnd::PanelInfo;
-		PanelInfo panels[MainWnd::panel_count] =
+		MainWnd::PanelInfo panels[MainWnd::panel_count] =
 		{
-			PanelInfo(&preview_wnd_, IDB_PREVIEW, _T("Toggle Preview Panel"),     MacroAppData(ID_PREVIEW_WND_RECT)),
-			PanelInfo(&stat_wnd_,    IDB_STATS,   _T("Toggle Statistics Panel"),  MacroAppData(ID_STAT_WND_RECT)),
-			PanelInfo(&info_wnd_,    IDB_INFO,    _T("Toggle Map Details Panel"), MacroAppData(ID_INFO_WND_RECT))
+			MainWnd::PanelInfo(&preview_wnd_, IDB_PREVIEW, _T("Toggle Preview Panel"),     MacroAppData(ID_PREVIEW_WND_RECT)),
+			MainWnd::PanelInfo(&stat_wnd_,    IDB_STATS,   _T("Toggle Statistics Panel"),  MacroAppData(ID_STAT_WND_RECT)),
+			MainWnd::PanelInfo(&info_wnd_,    IDB_INFO,    _T("Toggle Map Details Panel"), MacroAppData(ID_INFO_WND_RECT))
 		};
 		main_wnd_.AddPanelWnds(panels);
 	}

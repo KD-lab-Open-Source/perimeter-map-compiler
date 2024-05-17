@@ -991,7 +991,7 @@ void PreviewWnd::Render()
 				D3DXMATRIX stretch_matrix;
 				D3DXMatrixScaling(&stretch_matrix, 1.0f, 1.0f, world_stretch_);
 				PushWorldMatrix(stretch_matrix);
-				LOKI_ON_BLOCK_EXIT_OBJ(*this, PreviewWnd::PopWorldMatrix);
+				LOKI_ON_BLOCK_EXIT_OBJ(*this, &PreviewWnd::PopWorldMatrix);
 				// render terrain
 				if (textures_valid_ && terrain_valid_)
 				{
@@ -1047,7 +1047,7 @@ void PreviewWnd::Render()
 					D3DXMATRIX zl_height_matrix;
 					D3DXMatrixTranslation(&zl_height_matrix, 0, 0, (zero_level_ + 0.5f) * world_stretch_);
 					PushWorldMatrix(zl_height_matrix);
-					LOKI_ON_BLOCK_EXIT_OBJ(*this, PreviewWnd::PopWorldMatrix);
+					LOKI_ON_BLOCK_EXIT_OBJ(*this, &PreviewWnd::PopWorldMatrix);
 					// render
 					device_->SetFVF(ColouredVertex::FVF);
 					if (D3D_OK != device_->SetTexture(0, NULL))
@@ -1075,7 +1075,7 @@ void PreviewWnd::Render()
 						D3DXMatrixMultiply(&frame_marker_matrix, &frame_marker_rotation, &frame_marker_matrix);
 					}
 					PushWorldMatrix(frame_marker_matrix);
-					LOKI_ON_BLOCK_EXIT_OBJ(*this, PreviewWnd::PopWorldMatrix);
+					LOKI_ON_BLOCK_EXIT_OBJ(*this, &PreviewWnd::PopWorldMatrix);
 					// render the marker
 					if (D3D_OK != device_->SetStreamSource(0, marker.vertices_, 0, sizeof(ColouredVertex)))
 					{
