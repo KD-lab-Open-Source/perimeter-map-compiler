@@ -10,7 +10,7 @@ Clone this repository with submodules
 
 **This needed to be done once**
 
-1. Open 3rdparty/freeimage/FreeImage.2017.sln in Visual Studio
+1. Open **3rdparty/freeimage/FreeImage.2017.sln** in Visual Studio
 2. Migrate project to your version of studio (if needed)
 3. Select Build -> Batch Build...
 4. Select **FreeImageLib / Debug / Win32** and **FreeImagePlus / Debug / Win32**
@@ -21,7 +21,7 @@ Clone this repository with submodules
 
 **This needed to be done once**
 
-1. Open 3rdparty/tinyxpath/tinyxpath.sln in Visual Studio
+1. Open **3rdparty/tinyxpath/tinyxpath.sln** in Visual Studio
 2. Migrate project to your version of studio (if needed)
 3. Select Build -> Batch Build...
 4. Select **tinyxpath_lib / Debug / Win32**
@@ -30,7 +30,7 @@ Clone this repository with submodules
 
 ### Building perimeter-map-compiler
 
-1. Open perimeter-map-compiler.sln in Vistual Studio 2022 (or greater)
+1. Open **perimeter-map-compiler.sln** in Vistual Studio 2022 (or greater)
 2. Select Debug / x86
 3. Build or Run
 
