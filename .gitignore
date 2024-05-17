@@ -1,0 +1,5 @@
+compiler/Debug
+compiler/Release
+runtime/*.exe
+runtime/*.pdb
+.vs

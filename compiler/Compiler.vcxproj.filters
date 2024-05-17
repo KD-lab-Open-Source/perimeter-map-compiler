@@ -1,0 +1,381 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>ipp;cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx</Extensions>
+    </Filter>
+    <Filter Include="server side">
+      <UniqueIdentifier>{fc1c657a-dd1d-46f3-b188-8cb771dac50b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\about wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\btdb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\error handler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\file tracker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\info wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\map manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\panel wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pmc wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\preference wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\preview wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\project create wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\project manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\project settings wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\project tasks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\resource management.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\script creator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\loki\Singleton.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\loki\SmallObj.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\resources\spg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stat wnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stdafx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\task common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\task resource manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\task resources.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\unit manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\version detector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\xml creator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\gaussian blur.ipp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\about wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app data.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\btdb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\error handler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="event.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\file tracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\foreach.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\info wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\interop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\map manager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\map settings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\panel wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pmc wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\preference wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\preview wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\project create wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\project data.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\project manager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\project settings wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\project tasks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\resources\resource ids.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\resource management.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\resources\save callback.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\script creator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\script grammar.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\resources\spg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stat wnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\static serializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stdafx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\task common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\task resource manager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\task resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\task resources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\unit manager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\version detector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\xml creator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resource\bz23.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resource\img1.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="server side\list_maps.php">
+      <Filter>server side</Filter>
+    </None>
+    <None Include="server side\admin\map_erase.php">
+      <Filter>server side</Filter>
+    </None>
+    <None Include="server side\admin\map_list_view.php">
+      <Filter>server side</Filter>
+    </None>
+    <None Include="resource\about.evmp.bz2" />
+    <None Include="VTune\Compiler.vpj" />
+    <None Include="resource\leveledSurfaceTexture.bz2" />
+    <None Include="spg.bz2" />
+    <None Include="resource\spg.bz2" />
+    <None Include="resource\spg2.bz2" />
+    <None Include="resource\sph.bz2" />
+    <None Include="sph.bz2" />
+    <None Include="resource\survival_spg.bz2" />
+    <None Include="resource\up.bz2" />
+    <None Include="world.ini" />
+    <None Include="resource\world.ini" />
+    <None Include="Worlds.prm" />
+    <None Include="resource\worlds_list.bz2" />
+    <None Include="resource\worlds_list2.bz2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resource\compiler.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Compiler.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="details window.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\details window.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\details.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\details.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="green light.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\green light.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icon1.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icon2.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="preview window.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\preview window.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\preview.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\preview.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\red light.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="red light.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="shrub(grayscale).bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="shrub(small grayscale).ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\shrub.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="shrub.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\shrub2.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="shrub2.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="small.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\stat window.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="stat window.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\stats.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\stats.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Triangle.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\triangle.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="triangle.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resource\leveledSurfaceTexture.tga" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Compiler.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="readme.txt" />
+    <Text Include="spg_header.txt" />
+    <Text Include="resource\worlds_list.txt" />
+    <Text Include="worlds_list.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="server side\map_list.dat">
+      <Filter>server side</Filter>
+    </CustomBuild>
+    <CustomBuild Include="server side\map_register.php">
+      <Filter>server side</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>
