@@ -1,4 +1,4 @@
-	//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Perimeter Map Compiler
 // Copyright (c) 2005, Don Reba
 // All rights reserved.
@@ -32,7 +32,7 @@
 #include "StdAfx.h"
 
 #include "app data.h"
-#include "resource.h"
+#include "..\resource.h"
 #include "version detector.h"
 
 #include <commctrl.h>

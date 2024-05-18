@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -33,10 +33,6 @@
 
 #include "panel wnd.h"
 
-#pragma warning(push, 1)
-#include "..\..\3rdparty\htmlayout\htmlayout.h"
-#pragma warning(pop)
-
 class PreviewWnd;
 
 //---------------------------------
@@ -51,38 +47,32 @@ public:
 		virtual void operator() () = 0;
 	};
 	typedef vector<POINT> Locations;
-// construction
+// construction/destruction
 public:
 	InfoWnd(PreviewWnd &preview_wnd, ZeroLevelChanged *zero_layer_changed);
 // interface
 public:
-	bool Create(HWND parent_wnd, const RECT &window_rect);
-	void Update();
-	void SetReadOnly(bool read_only);
-// message processing
+	bool Create(HWND parent_wnd, const RECT &window_rect, bool enabled = true);
+	void Update(bool read_only = false);
+// message handlers
 private:
-	void OnCommand(Msg<WM_COMMAND>        &msg);
-	void OnNotify (Msg<WM_NOTIFY>         &msg);
-	void OnSize   (Msg<WM_SIZE>           &msg);
-	void OnTimer  (Msg<WM_TIMER>          &msg);
+	void OnColorStatic(Msg<WM_CTLCOLORSTATIC> &msg);
+	void OnCommand    (Msg<WM_COMMAND>        &msg);
+	void OnInitDialog (Msg<WM_INITDIALOG>     &msg);
+	void OnTimer      (Msg<WM_TIMER>          &msg);
+// internal function
 protected:
 	void ProcessMessage(WndMsg &msg);
-// internal function
 private:
 	void AddLocation(tstring name, uint x, uint y);
-	SIZE CalculateMinWindowSize() const;
-	SIZE CalculateWindowSize() const;
-	void PositionChildren();
-	// html manipulation
-	bool SetHtmlText(const char * id, int value, htmlayout::dom::element root);
-	bool SetColorBox(const char * id, COLORREF color, htmlayout::dom::element root);
+	static BOOL CALLBACK EnumChildrenProc(HWND hwnd, LPARAM lprm);
+	void EnableControls(bool on);
 // data
 private:
+	HBRUSH            fog_colour_;
+	COLORREF          custom_colours_[16];
 	Locations         locations_;
 	PreviewWnd       &preview_wnd_;
-	bool              read_only_;
 	uint              zero_level_changes_ignored_;
 	ZeroLevelChanged *zero_level_changed_;
-	// layout
-	HWND layout_;
 };

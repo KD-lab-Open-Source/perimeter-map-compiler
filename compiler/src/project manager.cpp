@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------
 // Perimeter Map Compiler
 // Copyright (c) 2005, Don Reba
 // All rights reserved.
@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -37,14 +37,7 @@
 #include "project manager.h"
 #include "task common.h"
 
-#include <process.h>
-
 #include <stdexcept>
-
-#include <loki/ScopeGuard.h>
-#include <loki/static_check.h>
-
-using namespace Loki;
 
 //-------------------------------
 // project manager implementation
@@ -58,7 +51,6 @@ ProjectManager::ProjectManager(
 	:ErrorHandler       (main_wnd.hwnd_)
 	,processor_thread_  (NULL)
 	,info_wnd_          (info_wnd)
-	,opening_count_     (0)
 	,preview_wnd_       (preview_wnd)
 	,project_state_     (PS_INACTIVE)
 	,stat_wnd_          (stat_wnd)
@@ -77,8 +69,7 @@ ProjectManager::~ProjectManager()
 	if (NULL != processor_thread_)
 	{
 		{
-			EnterCriticalSection(&processor_section_);
-			LOKI_ON_BLOCK_EXIT(LeaveCriticalSection, &processor_section_);
+			AutoCriticalSection acs(&processor_section_);
 			stop_processing_ = true;
 		}
 		ResumeThread(processor_thread_);
@@ -112,8 +103,8 @@ bool ProjectManager::Initialize()
 {
 	// create the processor thread
 	stop_processing_ = false;
-	uint thread_id;
-	processor_thread_ = ri_cast<HANDLE>(_beginthreadex(NULL, 0, &ProcessorThreadProxy, this, 0, &thread_id));
+	DWORD thread_id;
+	processor_thread_ = CreateThread(NULL, 0, ProcessorThread, this, 0, &thread_id);
 	if (NULL == processor_thread_)
 	{
 		MacroDisplayError(_T("Background processing thread could not be created."));
@@ -137,6 +128,8 @@ void ProjectManager::Close()
 		return;
 	if (PS_PROJECT == project_state_)
 		tracker_.Stop();
+	if (PS_SHRUB == project_state_)
+		AddTask(new FreeProjectDataTask());
 	// save project data
 	if (PS_PROJECT == project_state_)
 	{
@@ -222,11 +215,10 @@ void ProjectManager::OpenProject(LPCTSTR project_path, HWND main_hwnd, bool new_
 			TaskCommon::MapInfo::LoadFromGlobal()));
 	}
 	// create default files
-	AddTask(new SetResourceManagerEnabledTask(true));
 	if (new_project)
 		AddTask(new CreateDefaultFilesTask(error_hwnd_));
 	// update panels
-	AddTask(new ChangeProjectTask(preview_wnd_));
+	AddTask(new ChangeProjectTask(info_wnd_, preview_wnd_));
 	// initialize the tracker, setting the last write time
 	//  in a way that would schedule the files for immediate update
 	FILETIME null_last_write;
@@ -240,7 +232,6 @@ void ProjectManager::OpenProject(LPCTSTR project_path, HWND main_hwnd, bool new_
 //		tracker_.SetDatum(RS_SURFACE, file_names_[RS_SURFACE].c_str(), null_last_write);
 //	if (MacroProjectData(ID_CUSTOM_SKY))
 //		tracker_.SetDatum(RS_SKY, file_names_[RS_SKY].c_str(), null_last_write);
-	ChangeOpeningCount(+1);
 	AddTask(new NotifyProjectOpenTask(main_hwnd));
 }
 
@@ -264,13 +255,16 @@ void ProjectManager::PackShrub()
 		MacroAppData(ID_DISPLAY_ZERO_LAYER),
 		file_names_,
 		TaskCommon::MapInfo::LoadFromGlobal()));
+	if (PS_PROJECT == project_state_)
+		AddTask(new LoadProjectDataTask(error_hwnd_));
 	AddTask(new PackShrubTask(
 		MacroProjectData(ID_CUSTOM_HARDNESS),
 		MacroProjectData(ID_CUSTOM_SKY),
 		MacroProjectData(ID_CUSTOM_SURFACE),
 		MacroProjectData(ID_CUSTOM_ZERO_LAYER),
-		MacroAppData(ID_USE_REGISTRATION),
 		error_hwnd_));
+	if (PS_PROJECT == project_state_)
+		AddTask(new FreeProjectDataTask());
 }
 
 #define MacroXmlToPos(num)                                                                        \
@@ -446,7 +440,7 @@ bool ProjectManager::UnpackShrub(LPCTSTR shrub_path, HWND main_hwnd)
 	MacroXmlToPos(3);
 	MacroXmlToPos(4);
 	// update panels
-	AddTask(new ChangeProjectTask(preview_wnd_));
+	AddTask(new ChangeProjectTask(info_wnd_, preview_wnd_, true));
 	// enqueue the task of updating project data
 	{
 		LPCTSTR map_name(MacroProjectData(ID_MAP_NAME).c_str());
@@ -469,22 +463,28 @@ bool ProjectManager::UnpackShrub(LPCTSTR shrub_path, HWND main_hwnd)
 			TaskCommon::MapInfo::LoadFromGlobal()));
 	}
 	// enqueue the task of unpacking the rest of the data
-	AddTask(new SetResourceManagerEnabledTask(false));
 	AddTask(new UnpackShrubTask(
 		doc,
 		buffer + xml_string_size,
 		buffer,
+		info_wnd_,
+		preview_wnd_,
+		stat_wnd_,
+		*this,
 		error_hwnd_));
-	IdsType ids;
-	ids.set();
-	UpdatePanels(ids);
+	AddTask(new UpdatePanelsTask(
+		info_wnd_,
+		preview_wnd_,
+		stat_wnd_,
+		*this,
+		error_hwnd_));
 	return true;
 }
 
 void ProjectManager::OnProjectOpen(HWND main_hwnd)
 {
 	SetWindowText(main_hwnd, MacroProjectData(ID_MAP_NAME).c_str());
-	ChangeOpeningCount(-1);
+	tracker_.Start(folder_path_.c_str(), &file_updated_);
 }
 
 void ProjectManager::OnProjectUnpacked(HWND main_hwnd)
@@ -526,12 +526,11 @@ void ProjectManager::InstallMap(LPCTSTR install_path, uint version)
 		MacroAppData(ID_DISPLAY_ZERO_LAYER),
 		file_names_,
 		TaskCommon::MapInfo::LoadFromGlobal()));
-	AddTask(new InstallMapTask(
-		error_hwnd_,
-		install_path,
-		version,
-		MacroProjectData(ID_CUSTOM_ZERO_LAYER),
-		MacroAppData(ID_RENAME_TO_UNREGISTERED)));
+	if (PS_PROJECT == project_state_)
+		AddTask(new LoadProjectDataTask(error_hwnd_));
+	AddTask(new InstallMapTask(error_hwnd_, install_path, version));
+	if (PS_PROJECT == project_state_)
+		AddTask(new FreeProjectDataTask());
 }
 
 void ProjectManager::SaveThumbnail()
@@ -539,7 +538,45 @@ void ProjectManager::SaveThumbnail()
 	IdsType ids(resource_count);
 	ids[RS_HEIGHTMAP] = true;
 	ids[RS_TEXTURE]   = true;
+	if (PS_PROJECT == project_state_)
+		AddTask(new LoadProjectDataTask(ids, error_hwnd_));
 	AddTask(new SaveThumbTask(error_hwnd_));
+	if (PS_PROJECT == project_state_)
+		AddTask(new FreeProjectDataTask());
+}
+
+void ProjectManager::ReloadFiles(const IdsType &ids)
+{
+	if (ids.none() || PS_INACTIVE == project_state_)
+		return;
+	LPCTSTR map_name(MacroProjectData(ID_MAP_NAME).c_str());
+	SIZE map_size = {
+		exp2(MacroProjectData(ID_POWER_X)),
+		exp2(MacroProjectData(ID_POWER_Y))
+	};
+	AddTask(new UpdateDataTask(
+		map_name,
+		folder_path_.c_str(),
+		map_size,
+		project_state_,
+		MacroAppData(ID_FAST_TEXTURE_QUANTIZATION),
+		MacroAppData(ID_ENABLE_LIGHTING),
+		MacroAppData(ID_THRESHOLD),
+		MacroAppData(ID_DISPLAY_HARDNESS),
+		MacroAppData(ID_DISPLAY_TEXTURE),
+		MacroAppData(ID_DISPLAY_ZERO_LAYER),
+		file_names_,
+		TaskCommon::MapInfo::LoadFromGlobal()));
+	if (project_state_ == PS_PROJECT)
+		AddTask(new LoadProjectDataTask(ids, error_hwnd_));
+	AddTask(new UpdatePanelsTask(
+		info_wnd_,
+		preview_wnd_,
+		stat_wnd_,
+		*this,
+		error_hwnd_));
+	if (project_state_ == PS_PROJECT)
+		AddTask(new FreeProjectDataTask());
 }
 
 void ProjectManager::CreateResource(Resource id, HWND main_hwnd)
@@ -567,6 +604,11 @@ void ProjectManager::CreateResource(Resource id, HWND main_hwnd)
 		TaskCommon::MapInfo::LoadFromGlobal()));
 }
 
+void ProjectManager::DisableResource(Resource id)
+{
+	tracker_.EnableDatum(id, false);
+}
+
 void ProjectManager::ImportScript(LPCTSTR script_path, HWND main_hwnd)
 {
 	vector<TCHAR> buffer_v(MAX_PATH);
@@ -574,28 +616,6 @@ void ProjectManager::ImportScript(LPCTSTR script_path, HWND main_hwnd)
 	PathCombine(buffer, folder_path_.c_str(), file_names_[RS_SCRIPT].c_str());
 	AddTask(new ImportScriptTask(script_path, buffer));
 	AddTask(new NotifyResourceCreatedTask(RS_SCRIPT, main_hwnd));
-}
-
-void ProjectManager::UpdateInfoWnd(IdsType ids)
-{
-	AddTask(new UpdateInfoWndTask(ids, info_wnd_, *this, error_hwnd_));
-}
-
-void ProjectManager::UpdatePreviewWnd(IdsType ids)
-{
-	AddTask(new UpdatePreviewWndTask(ids, preview_wnd_, *this, error_hwnd_));
-}
-
-void ProjectManager::UpdateStatWnd(IdsType ids)
-{
-	AddTask(new UpdateStatWndTask(ids, stat_wnd_, *this, error_hwnd_));
-}
-
-void ProjectManager::UpdatePanels(IdsType ids)
-{
-	UpdateInfoWnd   (ids);
-	UpdatePreviewWnd(ids);
-	UpdateStatWnd   (ids);
 }
 
 void ProjectManager::UpdateSettings()
@@ -619,103 +639,73 @@ void ProjectManager::UpdateSettings()
 		TaskCommon::MapInfo::LoadFromGlobal()));
 }
 
-uint __stdcall ProjectManager::ProcessorThreadProxy(void *obj)
+DWORD WINAPI ProjectManager::ProcessorThread(LPVOID parameter)
 {
-	ri_cast<ProjectManager*>(obj)->ProcessorThread();
-	return 0;
-}
-
-void ProjectManager::ProcessorThread()
-{
-	TaskData data(this, error_hwnd_);
 	for (;;)
 	{
 		Task *task;
 		// interract with the ProjectManager object
 		{
-			EnterCriticalSection(&processor_section_);
-			ScopeGuard acs = MakeGuard(LeaveCriticalSection, &processor_section_);
+			ProjectManager *obj(ri_cast<ProjectManager*>(parameter));
+			AutoCriticalSection acs(&obj->processor_section_);
 			// processing should be suspended if the corrsponding flag is set
-			if (stop_processing_)
+			if (obj->stop_processing_)
 				break;
 			// transmit the number of tasks left
-			(*tasks_left_)(tasks_.size());
+			(*obj->tasks_left_)(obj->tasks_.size());
 			// processing should be suspended if the queue is empty
-			if (tasks_.empty())
+			if (obj->tasks_.empty())
 			{
-				acs.Dismiss();
-				LeaveCriticalSection(&processor_section_);
+				acs.Leave();
 				SuspendThread(GetCurrentThread());
 				continue;
 			}
 			// get the current task
-			task = tasks_.front();
-			tasks_.pop();
+			task = obj->tasks_.front();
+			obj->tasks_.pop();
 		}
 		// perform the task
 		// this is a very convenient place for catching exceptions
 		try
 		{
-			(*task)(data);
-			_CrtCheckMemory();
+			AutoCriticalSection(&Task::task_data_.section_);
+			(*task)();
 		}
 		catch (std::bad_alloc)
 		{
-			EnterCriticalSection(&processor_section_);
-			LOKI_ON_BLOCK_EXIT(LeaveCriticalSection, &processor_section_);
-			MacroDisplayError(_T(
-				"There was not enough memory to carry out a task.\n"
-				"The queued tasks will be cancelled."));
-			while (!tasks_.empty())
+			ProjectManager *obj(ri_cast<ProjectManager*>(parameter));
+			AutoCriticalSection acs(&obj->processor_section_);
+			obj->MacroDisplayError(_T("There was not enough memory to carry out a task.\nThe queued tasks will be cancelled."));
+			while (!obj->tasks_.empty())
 			{
-				delete tasks_.front();
-				tasks_.pop();
+				delete obj->tasks_.front();
+				obj->tasks_.pop();
 			}
 		}
 		catch (TaskException e)
 		{
+			ProjectManager *obj(ri_cast<ProjectManager*>(parameter));
 			tstring msg(e.Msg());
 			msg += _T("\nThe queued tasks will been cancelled.");
-			EnterCriticalSection(&processor_section_);
-			LOKI_ON_BLOCK_EXIT(LeaveCriticalSection, &processor_section_);
-			MacroDisplayError(msg.c_str());
-			while (!tasks_.empty())
+			AutoCriticalSection acs(&obj->processor_section_);
+			obj->MacroDisplayError(msg.c_str());
+			while (!obj->tasks_.empty())
 			{
-				delete tasks_.front();
-				tasks_.pop();
+				delete obj->tasks_.front();
+				obj->tasks_.pop();
 			}
 		}
 		delete task;
 	}
-}
-
-void ProjectManager::ChangeOpeningCount(int delta)
-{
-	// precondition
-	if (0 == delta)
-		return;
-	// opening count about to increase from 0
-	if (0 == opening_count_)
-	{
-		info_wnd_.SetReadOnly(true);
-	}
-	opening_count_ += delta;
-	_ASSERTE(opening_count_ >= 0);
-	// opening count back to 0
-	if (0 == opening_count_)
-	{
-		info_wnd_.Update();
-		info_wnd_.SetReadOnly(false);
-		tracker_.Start(folder_path_.c_str(), &file_updated_);
-	}
+	return 0;
 }
 
 void ProjectManager::AddTask(Task *task)
 {
-	_RPT1(_CRT_WARN, "AddTask(%s)\n", typeid(*task).name());
+	_RPT0(_CRT_WARN, typeid(*task).name());
+	_RPT0(_CRT_WARN, "\n");
 	{
-		EnterCriticalSection(&processor_section_);
-		LOKI_ON_BLOCK_EXIT(LeaveCriticalSection, &processor_section_);
+		AutoCriticalSection acs(&processor_section_);
 		tasks_.push(task);
 		(*tasks_left_)(tasks_.size());
 	}
@@ -724,9 +714,8 @@ void ProjectManager::AddTask(Task *task)
 
 void ProjectManager::FindFileNames()
 {
-	// create a name for the XML files
+	// create a name for the script file
 	file_names_[RS_SCRIPT] = _T("script.xml");
-	file_names_[RS_SPG]    = _T("mission.xml");
 	// find correct extensions for the bitmap resources
 	{
 		// allocate a buffer for path operations
@@ -781,16 +770,6 @@ void ProjectManager::FindFileNames()
 	}
 }
 
-void ProjectManager::OnSaveBegin(Resource id)
-{
-	tracker_.EnableDatum(id, false);
-}
-
-void ProjectManager::OnSaveEnd(Resource id)
-{
-	tracker_.EnableDatum(id, true);
-}
-
 //-------------------------------------------
 // ProjectManager::FileUpdated implementation
 //-------------------------------------------
@@ -801,12 +780,26 @@ ProjectManager::FileUpdated::FileUpdated(ProjectManager &project_manager)
 
 void ProjectManager::FileUpdated::operator() (const IdsType &ids)
 {
-	project_manager_.UpdatePanels(ids);
+	IdsType adjusted_ids;
+	adjusted_ids.set();
+	adjusted_ids.set(RS_SKY,     false);
+	adjusted_ids.set(RS_SURFACE, false);
+	// load data
+	project_manager_.AddTask(new LoadProjectDataTask(adjusted_ids, project_manager_.error_hwnd_));
+	project_manager_.AddTask(new UpdatePanelsTask(
+		project_manager_.info_wnd_,
+		project_manager_.preview_wnd_,
+		project_manager_.stat_wnd_,
+		project_manager_,
+		project_manager_.error_hwnd_));
+	project_manager_.AddTask(new FreeProjectDataTask());
 }
 
 //------------------------------------------------
 // ProjectManager::ZeroLevelChanged implementation
 //------------------------------------------------
+
+
 
 ProjectManager::ZeroLevelChanged::ZeroLevelChanged(ProjectManager &project_manager)
 	:project_manager_(project_manager)
@@ -814,9 +807,9 @@ ProjectManager::ZeroLevelChanged::ZeroLevelChanged(ProjectManager &project_manag
 
 void ProjectManager::ZeroLevelChanged::operator() ()
 {
-	if (!MacroProjectData(ID_CUSTOM_ZERO_LAYER))
+	if (!MacroProjectData(ID_CUSTOM_HARDNESS))
 		return;
 	IdsType ids;
-	ids.set(RS_ZERO_LAYER);
-	project_manager_.UpdatePanels(ids);
+	ids.set();
+	project_manager_.ReloadFiles(ids);
 }

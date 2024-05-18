@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -37,20 +37,15 @@
 //-------------------------
 
 PMCWindow::PMCWindow()
-	:ErrorHandler  (hwnd_)
-	,is_rect_valid_(false)
-	,cursor_       (LoadCursor(NULL, IDC_ARROW))
-	,old_cursor_   (NULL)
-{}
+	:ErrorHandler(hwnd_)
+{
+	cursor_ = LoadCursor(NULL, IDC_ARROW);
+	old_cursor_ = NULL;
+}
 
 RECT PMCWindow::GetRect() const
 {
 	return window_rect_;
-}
-
-bool PMCWindow::IsRectValid() const
-{
-	return is_rect_valid_;
 }
 
 void PMCWindow::ToggleWaitCursor(bool on)
@@ -79,7 +74,6 @@ void PMCWindow::OnDestroy(Msg<WM_DESTROY> &msg)
 void PMCWindow::OnMove(Msg<WM_MOVE> &msg)
 {
 	GetWindowRect(hwnd_, &window_rect_);
-	is_rect_valid_ = true;
 	msg.handled_ = true;
 }
 
@@ -92,7 +86,6 @@ void PMCWindow::OnSetCursor(Msg<WM_SETCURSOR> &msg)
 void PMCWindow::OnSize(Msg<WM_SIZE> &msg)
 {
 	GetWindowRect(hwnd_, &window_rect_);
-	is_rect_valid_ = true;
 	msg.handled_ = true;
 }
 
@@ -111,6 +104,5 @@ void PMCWindow::ProcessMessage(WndMsg &msg)
 
 void PMCWindow::SetRect(const RECT &rect)
 {
-	is_rect_valid_ = true;
-	window_rect_   = rect;
+	window_rect_ = rect;
 }

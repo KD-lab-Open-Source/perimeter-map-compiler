@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -35,7 +35,6 @@
 #pragma warning(disable: 4702)
 #pragma warning(disable: 4355)
 #pragma warning(disable: 4512)
-#pragma warning(disable: 4189)
 
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 #define _WIN32_WINDOWS 0x0401    // require Win98 or NT 4 at minimum
@@ -66,9 +65,6 @@ using std::vector;
 #include "FreeImagePlus.h"
 #include "..\..\3rdparty\jasper\jasper.h"
 #include "..\..\3rdparty\tinyxpath\tinyxml.h"
-#include "..\..\3rdparty\tinyxpath\xpath_processor.h"
-#include "..\..\3rdparty\FastDelegate\FastDelegate.h"
-namespace fd = fastdelegate;
 // project-wide utilites
 #include "util.h"
 #include "foreach.h"
@@ -80,5 +76,3 @@ typedef unsigned short ushort;
 // extremely annoying definitions
 #undef min
 #undef max
-// project-wide constants
-const uint prm_player_count = 4;

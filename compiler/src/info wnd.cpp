@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -34,22 +34,9 @@
 #include "info wnd.h"
 #include "preview wnd.h"
 #include "project data.h"
-#include "resource.h"
+#include "../resource.h"
 
 #include <commctrl.h>
-
-#include <iomanip>
-#include <sstream>
-
-//------------
-// some macros
-//------------
-
-#define MacroSafeWndCall(wnd, call) \
-	if (0 != wnd.hwnd_)              \
-	{                                \
-		wnd.call;                     \
-	}
 
 //----------------------------
 // additional message crackers
@@ -62,26 +49,17 @@
 
 //-----------------------
 // InfoWnd implementation
-// construction
 //-----------------------
 
 InfoWnd::InfoWnd(PreviewWnd &preview_wnd, ZeroLevelChanged *zero_layer_changed)
 	:preview_wnd_               (preview_wnd)
-	,layout_                    (NULL)
 	,zero_level_changed_        (zero_layer_changed)
 	,zero_level_changes_ignored_(0)
-{
-	SetReadOnly(true);
-}
+{}
 
-//-----------------------
-// InfoWnd implementation
-// interface
-//-----------------------
-
-bool InfoWnd::Create(HWND parent_wnd, const RECT &window_rect)
+bool InfoWnd::Create(HWND parent_wnd, const RECT &window_rect, bool enabled)
 {
-	// create the main window
+	// create the window
 	hwnd_ = CreateDialogParam(
 		GetModuleHandle(NULL),
 		MAKEINTRESOURCE(IDD_INFO_DLG),
@@ -90,235 +68,255 @@ bool InfoWnd::Create(HWND parent_wnd, const RECT &window_rect)
 		ri_cast<LPARAM>(this));
 	if (NULL == hwnd_)
 	{
-		MacroDisplayError(_T("The Details window could not be created."));
+		MacroDisplayError(_T("The preview window could not be created."));
 		return false;
 	}
-	// create the layout window
-	layout_ = CreateWindow(
-		HTMLayoutClassNameT(),
-		_T(""),
-		WS_CHILD|WS_VISIBLE,
-		0,
-		0,
-		0,
-		0,
+	SetRect(window_rect);
+	SetWindowPos(
 		hwnd_,
 		NULL,
-		GetModuleHandle(NULL),
-		NULL);
-	if (NULL == layout_)
-	{
-		MacroDisplayError(_T("The Details window layout could not be created."));
-		return false;
-	}
-	// load HTML
-	{
-		std::vector<wchar_t> path_v(MAX_PATH);
-		wchar_t * path(&path_v[0]);
-		GetCurrentDirectoryW(path_v.size(), path);
-		PathCombineW(path, path, L"skin\\info_wnd.html");
-		if (FALSE == HTMLayoutLoadFile(layout_, path))
-		{
-			MacroDisplayError(_T("The Details window layout could not be loaded."));
-			return false;
-		}
-	}
-	// position and resize the main window
-	{
-		SIZE size(CalculateWindowSize());
-		SetWindowPos(
-			hwnd_,
-			NULL,
-			window_rect.left,
-			window_rect.top,
-			size.cx,
-			size.cy,
-			SWP_NOACTIVATE | SWP_NOZORDER);
-	}
-
-	EnableWindow(hwnd_, TRUE);
+		window_rect.left,
+		window_rect.top,
+		0,
+		0,
+		SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE);
+	EnableWindow(hwnd_, enabled ? TRUE : FALSE);
 	return true;
 }
 
-void InfoWnd::Update()
+void InfoWnd::Update(bool read_only)
 {
-	using htmlayout::dom::element;
-	element root(element::root_element(layout_));
-	SetColorBox("map_fog_color", MacroProjectData(ID_FOG_COLOUR), root);
-	SetHtmlText("map_fog_start", MacroProjectData(ID_FOG_START), root);
-	SetHtmlText("map_fog_end", MacroProjectData(ID_FOG_END), root);
-	SetHtmlText("map_zero_layer", MacroProjectData(ID_ZERO_LEVEL), root);
-	root.update(true);
+	zero_level_changes_ignored_ = 0;
+	if (read_only)
+		EnableControls(false);
+	// fog colour
+	DeleteObject(fog_colour_);
+	fog_colour_ = CreateSolidBrush(MacroProjectData(ID_FOG_COLOUR));
+	// fog distance
+	SetDlgItemInt(hwnd_, IDC_FOG_START, MacroProjectData(ID_FOG_START), FALSE);
+	SetDlgItemInt(hwnd_, IDC_FOG_END,   MacroProjectData(ID_FOG_END),   FALSE);
+	// zero plast
+	UD_SetRange(GetDlgItem(hwnd_, IDC_ZERO_PLAST_SPIN), 255, 0);
+	UD_SetPos(GetDlgItem(hwnd_, IDC_ZERO_PLAST_SPIN), MacroProjectData(ID_ZERO_LEVEL));
+	// locations
+	UD_SetRange(GetDlgItem(hwnd_, IDC_LOCATION_X_SPIN), exp2(MacroProjectData(ID_POWER_X)) - 1, 0);
+	UD_SetRange(GetDlgItem(hwnd_, IDC_LOCATION_Y_SPIN), exp2(MacroProjectData(ID_POWER_Y)) - 1, 0);
+	locations_.at(0).x = MacroProjectData(ID_SP_1).x;
+	locations_.at(0).y = MacroProjectData(ID_SP_1).y;
+	locations_.at(1).x = MacroProjectData(ID_SP_2).x;
+	locations_.at(1).y = MacroProjectData(ID_SP_2).y;
+	locations_.at(2).x = MacroProjectData(ID_SP_3).x;
+	locations_.at(2).y = MacroProjectData(ID_SP_3).y;
+	locations_.at(3).x = MacroProjectData(ID_SP_4).x;
+	locations_.at(3).y = MacroProjectData(ID_SP_4).y;
+	locations_.at(4).x = MacroProjectData(ID_SP_0).x;
+	locations_.at(4).y = MacroProjectData(ID_SP_0).y;
+	ComboBox_SetCurSel(GetDlgItem(hwnd_, IDC_LOCATION_LIST), 0);
+	SendMessage(
+		hwnd_,
+		WM_COMMAND,
+		MAKEWPARAM(IDC_LOCATION_LIST, CBN_SELCHANGE),
+		ri_cast<LPARAM>(GetDlgItem(hwnd_, IDC_LOCATION_LIST)));
+	if (!read_only)
+		EnableControls(true);
 }
 
-void InfoWnd::SetReadOnly(bool read_only)
+void InfoWnd::OnColorStatic(Msg<WM_CTLCOLORSTATIC> &msg)
 {
-	read_only = true;
+	if (msg.ChildHwnd() == GetDlgItem(hwnd_, IDC_FOG_COLOUR))
+	{
+		msg.SetResult(fog_colour_);
+		msg.handled_ = true;
+	}
 }
-
-//-----------------------
-// InfoWnd implementation
-// message processing
-//-----------------------
+#define HANDLE_SP_CHANGE(num, s_sfx, c_sfx)                                 \
+	case IDC_SP##num##_##c_sfx:                                              \
+		if (EN_CHANGE == msg.CodeNotify())                                    \
+		{                                                                     \
+		const UINT max_val(exp2(MacroProjectData(ID_POWER_##c_sfx)) - 1);     \
+			UINT val(GetDlgItemInt(hwnd_, IDC_SP##num##_##c_sfx, NULL, TRUE)); \
+			val = __min(val, max_val);                                         \
+			MacroProjectData(ID_SP_##num).##s_sfx = val;                       \
+			preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_##num);         \
+		} break
 
 void InfoWnd::OnCommand(Msg<WM_COMMAND> &msg)
 {
-	//switch (msg.CtrlId())
-	//{
-	//case IDC_FOG_COLOUR_BTN:
-	//	{
-	//		CHOOSECOLOR cc = { 0 };
-	//		cc.lStructSize  = sizeof(cc);
-	//		cc.hwndOwner    = hwnd_;
-	//		cc.lpCustColors = custom_colours_;
-	//		cc.rgbResult    = MacroProjectData(ID_FOG_COLOUR);
-	//		cc.Flags        = CC_FULLOPEN | CC_RGBINIT;
-	//		if (ChooseColor(&cc))
-	//		{
-	//			MacroProjectData(ID_FOG_COLOUR) = cc.rgbResult;
-	//			DeleteObject(fog_colour_);
-	//			fog_colour_ = CreateSolidBrush(MacroProjectData(ID_FOG_COLOUR));
-	//			InvalidateRect(GetDlgItem(hwnd_, IDC_FOG_COLOUR), NULL, true);
-	//			MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_FOG_COLOUR));
-	//		}
-	//	} break;
-	//case IDC_FOG_END:
-	//	if (EN_CHANGE == msg.CodeNotify())
-	//	{
-	//		unsigned int val(GetDlgItemInt(hwnd_, IDC_FOG_END, NULL, FALSE));
-	//		MacroProjectData(ID_FOG_END) = val;
-	//		MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_FOG_END));
-	//	} break;
-	//case IDC_FOG_START:
-	//	if (EN_CHANGE == msg.CodeNotify())
-	//	{
-	//		UINT val(GetDlgItemInt(hwnd_, IDC_FOG_START, NULL, FALSE));
-	//		MacroProjectData(ID_FOG_START) = val;
-	//		MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_FOG_START));
-	//	} break;
-	//case IDC_LOCATION_LIST:
-	//	if (CBN_SELCHANGE == msg.CodeNotify())
-	//	{
-	//		// get the index of the newly selected element
-	//		size_t index;
-	//		{
-	//			int signed_index(ComboBox_GetCurSel(msg.CtrlHwnd()));
-	//			if (signed_index < 0)
-	//				return;
-	//			index = static_cast<size_t>(signed_index);
-	//		}
-	//		// set the position edit boxes to the corresponding values
-	//		POINT point(locations_.at(index));
-	//		UD_SetPos(GetDlgItem(hwnd_, IDC_LOCATION_X_SPIN), point.x);
-	//		UD_SetPos(GetDlgItem(hwnd_, IDC_LOCATION_Y_SPIN), point.y);
-	//		// adjust index and highlight the corresponding marker
-	//		switch (index)
-	//		{
-	//		case 0: index = 1; break;
-	//		case 1: index = 2; break;
-	//		case 2: index = 3; break;
-	//		case 3: index = 4; break;
-	//		case 4: index = 0; break;
-	//		}
-	//		MacroSafeWndCall(preview_wnd_, HighlightMarker(index));
-	//	} break;
-	//case IDC_LOCATION_X:
-	//	if (EN_CHANGE == msg.CodeNotify())
-	//	{
-	//		const UINT max_val(exp2(MacroProjectData(ID_POWER_X)) - 1);
-	//		UINT val(GetDlgItemInt(hwnd_, IDC_LOCATION_X, NULL, FALSE));
-	//		val = __min(val, max_val);
-	//		switch (ComboBox_GetCurSel(GetDlgItem(hwnd_, IDC_LOCATION_LIST)))
-	//		{
-	//		case 0:
-	//			MacroProjectData(ID_SP_1).x = val;
-	//			preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_1);
-	//			break;
-	//		case 1:
-	//			MacroProjectData(ID_SP_2).x = val;
-	//			preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_2);
-	//			break;
-	//		case 2:
-	//			MacroProjectData(ID_SP_3).x = val;
-	//			preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_3);
-	//			break;
-	//		case 3:
-	//			MacroProjectData(ID_SP_4).x = val;
-	//			preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_4);
-	//			break;
-	//		case 4:
-	//			MacroProjectData(ID_SP_0).x = val;
-	//			preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_0);
-	//			break;
-	//		}
-	//	} break;
-	//case IDC_LOCATION_Y:
-	//	if (EN_CHANGE == msg.CodeNotify())
-	//	{
-	//		const UINT max_val(exp2(MacroProjectData(ID_POWER_Y)) - 1);
-	//		UINT val(GetDlgItemInt(hwnd_, IDC_LOCATION_Y, NULL, FALSE));
-	//		val = __min(val, max_val);
-	//		switch (ComboBox_GetCurSel(GetDlgItem(hwnd_, IDC_LOCATION_LIST)))
-	//		{
-	//		case 0:
-	//			MacroProjectData(ID_SP_1).y = val;
-	//			MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_SP_1));
-	//			break;
-	//		case 1:
-	//			MacroProjectData(ID_SP_2).y = val;
-	//			MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_SP_2));
-	//			break;
-	//		case 2:
-	//			MacroProjectData(ID_SP_3).y = val;
-	//			MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_SP_3));
-	//			break;
-	//		case 3:
-	//			MacroProjectData(ID_SP_4).y = val;
-	//			MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_SP_4));
-	//			break;
-	//		case 4:
-	//			MacroProjectData(ID_SP_0).y = val;
-	//			MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_SP_0));
-	//			break;
-	//		}
-	//	} break;
-	//case IDC_ZERO_PLAST:
-	//	if (EN_CHANGE == msg.CodeNotify())
-	//	{
-	//		const UINT max_val(255);
-	//		UINT val(GetDlgItemInt(hwnd_, IDC_ZERO_PLAST, NULL, TRUE));
-	//		val = __min(val, max_val);
-	//		MacroProjectData(ID_ZERO_LEVEL) = val;
-	//		MacroSafeWndCall(preview_wnd_, ProjectDataChanged(ProjectData::ID_ZERO_LEVEL));
-	//		if (zero_level_changes_ignored_ >= 1 && IsWindowVisible(hwnd_))
-	//			SetTimer(hwnd_, 0, 3000, NULL);
-	//		else
-	//			++zero_level_changes_ignored_;
-	//	} break;
-	//case IDCANCEL:
-	//	ShowWindow(hwnd_, SW_HIDE);
-	//	break;
-	//}
-}
-
-void InfoWnd::OnNotify(Msg<WM_NOTIFY> &msg)
-{
-	if (msg.nmhdr().code == HLN_ATTACH_BEHAVIOR)
+	switch (msg.CtrlId())
 	{
-		LPNMHL_ATTACH_BEHAVIOR lpab(ri_cast<LPNMHL_ATTACH_BEHAVIOR>(msg.lprm_));
-		htmlayout::event_handler *pb = htmlayout::behavior::find(lpab->behaviorName, lpab->element);
-		if(pb) 
+	case IDC_FOG_COLOUR_BTN:
 		{
-			lpab->elementTag  = pb;
-			lpab->elementProc = htmlayout::behavior::element_proc;
-			lpab->elementEvents = pb->subscribed_to;
-		}
+			CHOOSECOLOR cc = { 0 };
+			cc.lStructSize  = sizeof(cc);
+			cc.hwndOwner    = hwnd_;
+			cc.lpCustColors = custom_colours_;
+			cc.rgbResult    = MacroProjectData(ID_FOG_COLOUR);
+			cc.Flags        = CC_FULLOPEN | CC_RGBINIT;
+			if (ChooseColor(&cc))
+			{
+				MacroProjectData(ID_FOG_COLOUR) = cc.rgbResult;
+				DeleteObject(fog_colour_);
+				fog_colour_ = CreateSolidBrush(MacroProjectData(ID_FOG_COLOUR));
+				InvalidateRect(GetDlgItem(hwnd_, IDC_FOG_COLOUR), NULL, true);
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_FOG_COLOUR);
+			}
+		} break;
+	case IDC_FOG_END:
+		if (EN_CHANGE == msg.CodeNotify())
+		{
+			unsigned int val(GetDlgItemInt(hwnd_, IDC_FOG_END, NULL, FALSE));
+			MacroProjectData(ID_FOG_END) = val;
+			preview_wnd_.ProjectDataChanged(ProjectData::ID_FOG_END);
+		} break;
+	case IDC_FOG_START:
+		if (EN_CHANGE == msg.CodeNotify())
+		{
+			UINT val(GetDlgItemInt(hwnd_, IDC_FOG_START, NULL, FALSE));
+			MacroProjectData(ID_FOG_START) = val;
+			preview_wnd_.ProjectDataChanged(ProjectData::ID_FOG_START);
+		} break;
+	case IDC_LOCATION_LIST:
+		if (CBN_SELCHANGE == msg.CodeNotify())
+		{
+			// get the index of the newly selected element
+			size_t index;
+			{
+				int signed_index(ComboBox_GetCurSel(msg.CtrlHwnd()));
+				if (signed_index < 0)
+					return;
+				index = static_cast<size_t>(signed_index);
+			}
+			// set the position edit boxes to the corresponding values
+			POINT point(locations_.at(index));
+			UD_SetPos(GetDlgItem(hwnd_, IDC_LOCATION_X_SPIN), point.x);
+			UD_SetPos(GetDlgItem(hwnd_, IDC_LOCATION_Y_SPIN), point.y);
+			// adjust index and highlight the corresponding marker
+			switch (index)
+			{
+			case 0: index = 1; break;
+			case 1: index = 2; break;
+			case 2: index = 3; break;
+			case 3: index = 4; break;
+			case 4: index = 0; break;
+			}
+			preview_wnd_.HighlightMarker(index);
+		} break;
+	case IDC_LOCATION_X:
+		if (EN_CHANGE == msg.CodeNotify())
+		{
+			const UINT max_val(exp2(MacroProjectData(ID_POWER_X)) - 1);
+			UINT val(GetDlgItemInt(hwnd_, IDC_LOCATION_X, NULL, FALSE));
+			val = __min(val, max_val);
+			switch (ComboBox_GetCurSel(GetDlgItem(hwnd_, IDC_LOCATION_LIST)))
+			{
+			case 0:
+				MacroProjectData(ID_SP_1).x = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_1);
+				break;
+			case 1:
+				MacroProjectData(ID_SP_2).x = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_2);
+				break;
+			case 2:
+				MacroProjectData(ID_SP_3).x = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_3);
+				break;
+			case 3:
+				MacroProjectData(ID_SP_4).x = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_4);
+				break;
+			case 4:
+				MacroProjectData(ID_SP_0).x = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_0);
+				break;
+			}
+		} break;
+	case IDC_LOCATION_Y:
+		if (EN_CHANGE == msg.CodeNotify())
+		{
+			const UINT max_val(exp2(MacroProjectData(ID_POWER_Y)) - 1);
+			UINT val(GetDlgItemInt(hwnd_, IDC_LOCATION_Y, NULL, FALSE));
+			val = __min(val, max_val);
+			switch (ComboBox_GetCurSel(GetDlgItem(hwnd_, IDC_LOCATION_LIST)))
+			{
+			case 0:
+				MacroProjectData(ID_SP_1).y = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_1);
+				break;
+			case 1:
+				MacroProjectData(ID_SP_2).y = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_2);
+				break;
+			case 2:
+				MacroProjectData(ID_SP_3).y = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_3);
+				break;
+			case 3:
+				MacroProjectData(ID_SP_4).y = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_4);
+				break;
+			case 4:
+				MacroProjectData(ID_SP_0).y = val;
+				preview_wnd_.ProjectDataChanged(ProjectData::ID_SP_0);
+				break;
+			}
+		} break;
+	case IDC_ZERO_PLAST:
+		if (EN_CHANGE == msg.CodeNotify())
+		{
+			const UINT max_val(255);
+			UINT val(GetDlgItemInt(hwnd_, IDC_ZERO_PLAST, NULL, TRUE));
+			val = __min(val, max_val);
+			MacroProjectData(ID_ZERO_LEVEL) = val;
+			preview_wnd_.ProjectDataChanged(ProjectData::ID_ZERO_LEVEL);
+			if (zero_level_changes_ignored_ >= 1 && IsWindowVisible(hwnd_))
+				SetTimer(hwnd_, 0, 3000, NULL);
+			else
+				++zero_level_changes_ignored_;
+		} break;
+	case IDCANCEL:
+		ShowWindow(hwnd_, SW_HIDE);
+		break;
 	}
 }
 
-void InfoWnd::OnSize(Msg<WM_SIZE> &msg)
+void InfoWnd::OnInitDialog(Msg<WM_INITDIALOG> &msg)
 {
-	PositionChildren();
+	HWND item;
+	// initialize the location list
+	{
+		HWND locus_list(GetDlgItem(hwnd_, IDC_LOCATION_LIST));
+		AddLocation(_T("Player 1"),        MacroProjectData(ID_SP_1).x, MacroProjectData(ID_SP_1).y);
+		AddLocation(_T("Player 2"),        MacroProjectData(ID_SP_2).x, MacroProjectData(ID_SP_2).y);
+		AddLocation(_T("Player 3"),        MacroProjectData(ID_SP_3).x, MacroProjectData(ID_SP_3).y);
+		AddLocation(_T("Player 4"),        MacroProjectData(ID_SP_4).x, MacroProjectData(ID_SP_4).y);
+		AddLocation(_T("Survival Player"), MacroProjectData(ID_SP_0).x, MacroProjectData(ID_SP_0).y);
+		ComboBox_SetCurSel(locus_list, 0);
+		{
+			RECT rect = { 0 };
+			GetWindowRect(locus_list, &rect);
+			ScreenToClient(GetParent(locus_list), &rect);
+			MoveWindow(locus_list, rect.left, rect.top, rect.right - rect.left, 128, FALSE);
+		}
+	}
+	// set spin controls
+	item = GetDlgItem(hwnd_, IDC_ZERO_PLAST_SPIN);
+	UD_SetRange(item, 255, 0);
+	UD_SetPos(item, 0);
+	// set colours
+	fog_colour_ = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
+	for (int i(0); i != 16; ++i)
+		custom_colours_[i] = RGB(255, 255, 255);
+	// set fog distance values
+	SetDlgItemInt(hwnd_, IDC_FOG_START, 0u, FALSE);
+	SetDlgItemInt(hwnd_, IDC_FOG_END,   0u, FALSE);
+	// set colour button icon
+	Button_SetIcon(GetDlgItem(hwnd_, IDC_FOG_COLOUR_BTN), IDI_TRIANGLE);
+	// disable all controls
+	EnableControls(false);
+	// wrap up
+	msg.result_ = TRUE;
+	msg.handled_ = true;
 }
 
 void InfoWnd::OnTimer(Msg<WM_TIMER> &msg)
@@ -332,19 +330,14 @@ void InfoWnd::ProcessMessage(WndMsg &msg)
 {
 	static Handler mmp[] =
 	{
+		&InfoWnd::OnColorStatic,
 		&InfoWnd::OnCommand,
-		&InfoWnd::OnNotify,
-		&InfoWnd::OnSize,
-		&InfoWnd::OnTimer,
+		&InfoWnd::OnInitDialog,
+		&InfoWnd::OnTimer
 	};
 	if (!Handler::Call(mmp, this, msg))
 		__super::ProcessMessage(msg);
 }
-
-//-----------------------
-// InfoWnd implementation
-// internal function
-//-----------------------
 
 void InfoWnd::AddLocation(tstring name, uint x, uint y)
 {
@@ -353,122 +346,16 @@ void InfoWnd::AddLocation(tstring name, uint x, uint y)
 	locations_.push_back(point);
 }
 
-SIZE InfoWnd::CalculateMinWindowSize() const
+BOOL CALLBACK InfoWnd::EnumChildrenProc(HWND hwnd, LPARAM lprm)
 {
-	RECT client;
-	GetClientRect(hwnd_, &client);
-	RECT window;
-	GetWindowRect(hwnd_, &window);
-	LONG dx(window.right  - window.left - client.right );
-	LONG dy(window.bottom - window.top  - client.bottom);
-	UINT min_w(::HTMLayoutGetMinWidth( layout_));
-	UINT min_h(::HTMLayoutGetMinHeight(layout_, min_w));
-	SIZE size = { dx + min_w, dy + min_h };
-	return size;
+	ri_cast<vector<HWND>*>(lprm)->push_back(hwnd);
+	return TRUE;
 }
 
-SIZE InfoWnd::CalculateWindowSize() const
+void InfoWnd::EnableControls(bool on)
 {
-	using htmlayout::dom::element;
-	SIZE size = { 0 };
-	// get the expandable list
-	element root(htmlayout::dom::element::root_element(layout_));
-	element bar(root.get_element_by_id(L"thebar"));
-	if (bar.is_valid())
-	{
-		uint bar_child_count(bar.children_count());
-		// get the content elements
-		vector<element> elements;
-		elements.reserve(bar_child_count);
-		for (uint i(0); i != bar_child_count; ++i)
-		{
-			htmlayout::dom::element child(bar.child(i));
-			htmlayout::dom::element content(child.find_first(".content"));
-			if (content.is_valid())
-				elements.push_back(content);
-		}
-		// show each content element, and measure the size
-		// keep the maximum
-		foreach (element &content, elements)
-		{
-			content.set_attribute("class", L"no_content");
-			root.update(true);
-			SIZE content_size(CalculateMinWindowSize());
-			if (content_size.cx > size.cx)
-				size.cx = content_size.cx;
-			if (content_size.cy > size.cy)
-				size.cy = content_size.cy;
-			content.set_attribute("class", L"content");
-		}
-	}
-	else
-	{
-		size = CalculateMinWindowSize();
-	}
-	return size;
-}
-
-void InfoWnd::PositionChildren()
-{
-	if (NULL != layout_)
-	{
-		RECT client_rect;
-		GetClientRect(hwnd_, &client_rect);
-		SetWindowPos(layout_, NULL, 0, 0, client_rect.right, client_rect.bottom, SWP_NOZORDER);
-	}
-}
-
-//-----------------------
-// InfoWnd implementation
-// html manipulation
-//-----------------------
-
-bool InfoWnd::SetHtmlText(const char * id, int value, htmlayout::dom::element root)
-{
-	using htmlayout::dom::element;
-	// buffer for integer conversion
-	wchar_t w_int_str[34];
-	// find the element
-	element e(root.get_element_by_id(id));
-	if (!e.is_valid())
-	{
-		_RPT1(_CRT_WARN, "SetHtmlText could not find an element with the id \"%s\"\n", id);
-		return false;
-	}
-	// convert the value to string, and set it
-	_itow(value, w_int_str, 10);
-	e.set_text(w_int_str);
-	return true;
-}
-
-bool InfoWnd::SetColorBox(const char * id, COLORREF color, htmlayout::dom::element root)
-{
-	using htmlayout::dom::element;
-	typedef std::basic_ostringstream
-		<
-			wchar_t,
-			std::char_traits<wchar_t>,
-			std::allocator<wchar_t>
-		> wostringstream;
-	// find the element
-	element e(root.get_element_by_id(id));
-	if (!e.is_valid())
-	{
-		_RPT1(_CRT_WARN, "SetColorBox could not find an element with the id \"%s\"\n", id);
-		return false;
-	}
-	// get the ".box" child
-	e = e.find_first(".box");
-	if (!e.is_valid())
-	{
-		_RPT1(_CRT_WARN, "SetColorBox could not find the \".box\" child of the color-box \"%s\"\n", id);
-		return false;
-	}
-	// exchange the red and blue bytes
-	color = (color & 0x00FF00) | (color & 0xFF0000) >> 16 | (color & 0x0000FF) << 16;
-	// set the background color
-	wostringstream stream;
-	stream << '#' << std::setfill(L'0') << std::setw(6) << std::hex << color;
-	e.set_style_attribute("background-color", stream.str().c_str());
-	return true;
+	vector<HWND> children;
+	EnumChildWindows(hwnd_, EnumChildrenProc, ri_cast<LPARAM>(&children));
+	foreach(HWND &hwnd, children)
+		EnableWindow(hwnd, on ? TRUE : FALSE);
 }

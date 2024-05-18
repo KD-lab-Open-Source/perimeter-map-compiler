@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -45,8 +45,7 @@ public:
 	PMCWindow();
 // interface
 public:
-	RECT GetRect()     const;
-	bool IsRectValid() const;
+	RECT GetRect() const;
 	virtual void ToggleWaitCursor(bool on);
 // message handlers
 protected:
@@ -64,6 +63,5 @@ protected:
 private:
 	HCURSOR cursor_;
 	HCURSOR old_cursor_;
-	bool    is_rect_valid_;
 	RECT    window_rect_;
 };

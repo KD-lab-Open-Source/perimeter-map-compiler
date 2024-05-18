@@ -6,12 +6,12 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 // 
-// • Redistributions of source code must retain the above copyright notice,
+// ï¿½ Redistributions of source code must retain the above copyright notice,
 //   this list of conditions and the following disclaimer. 
-// • Redistributions in binary form must reproduce the above copyright notice,
+// ï¿½ Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// ï¿½ Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -33,7 +33,7 @@
 
 #include "app.h"
 #include "app data.h"
-#include "resource.h"
+#include "../resource.h"
 
 #include <shlobj.h>
 
@@ -47,10 +47,6 @@ int APIENTRY _tWinMain(
 	LPTSTR    lpCmdLine,
 	int       nCmdShow)
 {
-	//_CrtSetDbgFlag(
-	//	_CRTDBG_ALLOC_MEM_DF
-	//	| _CRTDBG_CHECK_ALWAYS_DF
-	//	| _CRTDBG_LEAK_CHECK_DF);
 	App app;
 	if (!app.Initialize(hInstance, lpCmdLine))
 		return 1;
@@ -88,13 +84,17 @@ bool App::Initialize(HINSTANCE instance, LPCTSTR cmd_line)
 		if (!main_wnd_.Create(pos))
 			return false;
 	}
+	// initialize panels
+	info_wnd_   .Create(main_wnd_.hwnd_, MacroAppData(ID_INFO_WND_RECT));
+	preview_wnd_.Create(main_wnd_.hwnd_, MacroAppData(ID_PREVIEW_WND_RECT));
+	stat_wnd_   .Create(main_wnd_.hwnd_, MacroAppData(ID_STAT_WND_RECT));
 	// add the panels to the main window
 	{
 		MainWnd::PanelInfo panels[MainWnd::panel_count] =
 		{
-			MainWnd::PanelInfo(&preview_wnd_, IDB_PREVIEW, _T("Toggle Preview Panel"),     MacroAppData(ID_PREVIEW_WND_RECT)),
-			MainWnd::PanelInfo(&stat_wnd_,    IDB_STATS,   _T("Toggle Statistics Panel"),  MacroAppData(ID_STAT_WND_RECT)),
-			MainWnd::PanelInfo(&info_wnd_,    IDB_INFO,    _T("Toggle Map Details Panel"), MacroAppData(ID_INFO_WND_RECT))
+			MainWnd::PanelInfo(&preview_wnd_, IDB_PREVIEW, _T("Toggle Preview Panel")),
+			MainWnd::PanelInfo(&stat_wnd_,    IDB_STATS,   _T("Toggle Statistics Panel")),
+			MainWnd::PanelInfo(&info_wnd_,    IDB_INFO,    _T("Toggle Map Details Panel"))
 		};
 		main_wnd_.AddPanelWnds(panels);
 	}
@@ -102,9 +102,9 @@ bool App::Initialize(HINSTANCE instance, LPCTSTR cmd_line)
 	if (!project_manager_.Initialize())
 		return false;
 	// toggle panels' visibility
-	main_wnd_.ShowPanel(0, MacroAppData(ID_PREVIEW_WND_VISIBLE));
-	main_wnd_.ShowPanel(1, MacroAppData(ID_STAT_WND_VISIBLE));
-	main_wnd_.ShowPanel(2, MacroAppData(ID_INFO_WND_VISIBLE));
+	ShowWindow(info_wnd_.hwnd_,    MacroAppData(ID_INFO_WND_VISIBLE)    ? SW_SHOW : SW_HIDE);
+	ShowWindow(preview_wnd_.hwnd_, MacroAppData(ID_PREVIEW_WND_VISIBLE) ? SW_SHOW : SW_HIDE);
+	ShowWindow(stat_wnd_.hwnd_,    MacroAppData(ID_STAT_WND_VISIBLE)    ? SW_SHOW : SW_HIDE);
 	// show the main window
 	ShowWindow(main_wnd_.hwnd_, SW_SHOW);
 	SetForegroundWindow(main_wnd_.hwnd_);
@@ -152,17 +152,13 @@ int App::Run()
 void App::Destroy()
 {
 	// save application data
+	MacroAppData(ID_INFO_WND_RECT)       = info_wnd_   .GetRect();
 	MacroAppData(ID_INFO_WND_VISIBLE)    = info_wnd_   .IsVisible();
+	MacroAppData(ID_PREVIEW_WND_RECT)    = preview_wnd_.GetRect();
 	MacroAppData(ID_PREVIEW_WND_VISIBLE) = preview_wnd_.IsVisible();
+	MacroAppData(ID_STAT_WND_RECT)       = stat_wnd_   .GetRect();
 	MacroAppData(ID_STAT_WND_VISIBLE)    = stat_wnd_   .IsVisible();
-	if (info_wnd_.IsRectValid())
-		MacroAppData(ID_INFO_WND_RECT) = info_wnd_.GetRect();
-	if (preview_wnd_.IsRectValid())
-		MacroAppData(ID_PREVIEW_WND_RECT) = preview_wnd_.GetRect();
-	if (stat_wnd_.IsRectValid())
-		MacroAppData(ID_STAT_WND_RECT) = stat_wnd_.GetRect();
-	if (main_wnd_.IsRectValid())
-		MacroAppData(ID_MAIN_WND_RECT) = main_wnd_.GetRect();
+	MacroAppData(ID_MAIN_WND_RECT)       = main_wnd_   .GetRect();
 	SSAppData::Save(MakeIniFileName().c_str());
 	FreeImage_DeInitialise();
 	jas_image_clearfmts();

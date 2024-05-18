@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -63,8 +63,6 @@ public:
 		ID_ENABLE_LIGHTING,
 		ID_PERIMETER_PATH,
 		ID_PERIMETER_VERSION,
-		ID_RENAME_TO_UNREGISTERED,
-		ID_USE_REGISTRATION,
 		count_
 	};
 protected:
@@ -95,9 +93,7 @@ protected:
 			_T("fast texture quantization"),
 			_T("enable lighting"),
 			_T("perimeter path"),
-			_T("perimeter version"),
-			_T("rename to unregistered"),
-			_T("use registration")
+			_T("perimeter version")
 		};
 		return keys_table[i];
 	}
@@ -126,8 +122,6 @@ protected:
 			_T("Project Settings"),
 			_T("Project Settings"),
 			_T("Miscelleneous"),
-			_T("Miscelleneous"),
-			_T("Miscelleneous"),
 			_T("Miscelleneous")
 		};	
 		return sections_table[i];
@@ -153,8 +147,6 @@ protected:
 	MacroSSVar (ID_ENABLE_LIGHTING, bool, true);
 	MacroSSVar (ID_PERIMETER_PATH, tstring, _T(""));
 	MacroSSVar (ID_PERIMETER_VERSION, int, 0);
-	MacroSSVar (ID_RENAME_TO_UNREGISTERED, bool, true);
-	MacroSSVar (ID_USE_REGISTRATION,       bool, true);
 };
 
 typedef StaticSerializer<ApplicationData> SSAppData;

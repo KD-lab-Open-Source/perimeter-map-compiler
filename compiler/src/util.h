@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -28,6 +28,44 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //-----------------------------------------------------------------------------
 
+
+//----------------------------------------------
+// holds a critical section within its life span
+//----------------------------------------------
+class AutoCriticalSection
+{
+public:
+	AutoCriticalSection(CRITICAL_SECTION *section) : section(section)
+	{
+		in_section = true;
+		if (NULL != section)
+			EnterCriticalSection(section);
+	}
+	~AutoCriticalSection()
+	{
+		if (NULL != section && in_section)
+			LeaveCriticalSection(section);
+		in_section = false;
+	}
+	void Enter()
+	{
+		if (!in_section)
+		{
+			in_section = true;
+			if (NULL != section)
+				EnterCriticalSection(section);
+		}
+	}
+	void Leave()
+	{
+		if (NULL != section)
+			LeaveCriticalSection(section);
+		in_section = false;
+	}
+protected:
+	CRITICAL_SECTION *section;
+	bool in_section;
+};
 
 inline int exp2(unsigned int n)
 {
@@ -82,48 +120,3 @@ inline void ClientToScreen(HWND hwnd, RECT *rect)
 	rect_ref.right  = corner.x;
 	rect_ref.bottom = corner.y;
 }
-
-// binary search on cstrings
-inline const char * const * binary_search(
-	const char * const * begin,
-	const char * const * end,
-	const char *         val)
-{
-	const char * const *l = begin;
-	const char * const *r = end;
-	while (l <= r)
-	{
-		const char * const * m = l + (r - l) / 2;
-		int result(strcmp(*m, val));
-		if (result < 0)
-			l = m + 1;
-		else if (result > 0)
-			r = m - 1;
-		else
-			return m;
-	}
-	return end;
-}
-
-// find the index of a cstring in a sorted array
-inline size_t string_index(
-	const char * const name_array[],
-	size_t             array_size,
-	const char *       name)
-{
-	const char * const * const begin  = name_array;
-	const char * const * const end    = name_array + array_size;
-	const char * const * const result = binary_search(begin, end, name);
-	if (result != end)
-		return static_cast<size_t>(end - result);
-	_RPT1(_CRT_ERROR, "Unknown enumeration value: %s.", name);
-	return static_cast<size_t>(-1);
-}
-
-// determine the size of a static array as a compile-time constant
-// the trick is to call sizeof on a function that returns a reference
-//  to a char array with the same number of elements as in the argument
-template <typename T, size_t N>
-char (&equal_char_array(T (&)[N]))[N] { }
-#define  MacroArraySize(array) \
-	sizeof(equal_char_array(array))

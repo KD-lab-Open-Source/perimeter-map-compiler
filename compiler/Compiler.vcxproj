@@ -85,10 +85,10 @@
       <PrecompiledHeaderFile>src/stdafx.h</PrecompiledHeaderFile>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>..\3rdparty\boost_1_36_0;..\3rdparty\freeimage\Dist\x32;..\3rdparty\freeimage\Wrapper\FreeImagePlus\dist\x32;..\3rdparty\MSDXSDK_02_06\Include;..\3rdparty\loki-0.1.7\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\3rdparty\boost_1_36_0;..\3rdparty\freeimage\Dist\x32;..\3rdparty\freeimage\Wrapper\FreeImagePlus\dist\x32;..\3rdparty\MSDXSDK_02_06\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>tinyxpathd.lib;HTMLayout.lib;libbz2.lib;libjasper.lib;FreeImagePlusd.lib;FreeImageLibd.lib;comctl32.lib;d3d9.lib;d3dx9.lib;dxerr9.lib;dxguid.lib;shell32.lib;shlwapi.lib;Wininet.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>tinyxpathd.lib;libbz2.lib;libjasper.lib;FreeImagePlusd.lib;FreeImageLibd.lib;comctl32.lib;d3d9.lib;d3dx9.lib;dxerr9.lib;dxguid.lib;shell32.lib;shlwapi.lib;Wininet.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ShowProgress>NotSet</ShowProgress>
       <OutputFile>$(OutDir)Compiler.exe</OutputFile>
       <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -174,8 +174,6 @@
     <ClCompile Include="src\error handler.cpp" />
     <ClCompile Include="src\file tracker.cpp" />
     <ClCompile Include="src\info wnd.cpp" />
-    <ClCompile Include="src\loki\Singleton.cpp" />
-    <ClCompile Include="src\loki\SmallObj.cpp" />
     <ClCompile Include="src\main wnd.cpp" />
     <ClCompile Include="src\map manager.cpp" />
     <ClCompile Include="src\panel wnd.cpp" />
@@ -187,14 +185,11 @@
     <ClCompile Include="src\project settings wnd.cpp" />
     <ClCompile Include="src\project tasks.cpp" />
     <ClCompile Include="src\resource management.cpp" />
-    <ClCompile Include="src\resources\spg.cpp" />
     <ClCompile Include="src\script creator.cpp" />
     <ClCompile Include="src\stat wnd.cpp" />
     <ClCompile Include="src\stdafx.cpp" />
     <ClCompile Include="src\task common.cpp" />
-    <ClCompile Include="src\task resource manager.cpp" />
     <ClCompile Include="src\task resources.cpp" />
-    <ClCompile Include="src\unit manager.cpp" />
     <ClCompile Include="src\version detector.cpp" />
     <ClCompile Include="src\xml creator.cpp" />
   </ItemGroup>

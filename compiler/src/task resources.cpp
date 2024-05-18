@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -31,7 +31,7 @@
 
 #include "stdafx.h"
 
-#include "resource.h"
+#include "../resource.h"
 #include "project data.h"
 #include "resource management.h"
 #include "task resources.h"
@@ -39,10 +39,7 @@
 
 #include "gaussian blur.ipp"
 
-#include <algorithm>
 #include <sstream>
-
-#include <loki/ScopeGuard.h>
 
 using namespace RsrcMgmt;
 
@@ -53,42 +50,42 @@ namespace TaskCommon
 	// Hardness implementation
 	//------------------------
 
-	Hardness::info_t::info_t()
-		:path_()
-		,size_()
-	{}
-
-	Hardness::Hardness(const HWND &error_hwnd)
+	Hardness::Hardness(SIZE size, HWND &error_hwnd)
 		:ErrorHandler(error_hwnd)
-		,SaveCallback(RS_HARDNESS)
 		,data_(NULL)
+		,size_(size)
 	{}
 
 	Hardness::~Hardness()
 	{
-		if (NULL != data_)
-			delete [] data_;
-		data_ = NULL;
+		delete [] data_;
 	}
 
-	bool Hardness::Load()
+	void Hardness::MakeDefault()
 	{
 		_ASSERTE(NULL == data_);
-		// load the image
+		const size_t data_size(size_.cx * size_.cy);
+		data_ = new BYTE[data_size];
+		FillMemory(data_, data_size, 0xFF);
+	}
+
+	bool Hardness::Load(LPCTSTR path)
+	{
 		fipImage image;
-		image.load(info_.path_.c_str());
+		// load the image
+		image.load(path);
 		if (FALSE == image.isValid())
 		{
 			Sleep(512);
-			image.load(info_.path_.c_str());
+			image.load(path);
 			if (FALSE == image.isValid())
 			{
 				MakeDefault();
-				return false;
+				return true;
 			}
 		}
 		// make sure that dimensions are correct
-		if (image.getWidth() != info_.size_.cx || image.getHeight() != info_.size_.cy)
+		if (image.getWidth() != size_.cx || image.getHeight() != size_.cy)
 		{
 			MacroDisplayError(_T("Hardness map dimensions do not correspond to project settings."));
 			return false;
@@ -106,19 +103,12 @@ namespace TaskCommon
 		if (FALSE == image.flipVertical())
 			MacroDisplayError(_T("Hardness map bitmap could not be flipped."));
 		// allocate memory
-		const size_t data_size(info_.size_.cx * info_.size_.cy);
+		const size_t data_size(size_.cx * size_.cy);
 		_ASSERTE(NULL == data_);
 		data_ = new BYTE[data_size];
-		// read in data_
+		// read in data
 		CopyMemory(data_, image.accessPixels(), data_size);
 		return true;
-	}
-
-	void Hardness::Unload()
-	{
-		//Save();
-		delete [] data_;
-		data_ = NULL;
 	}
 
 	int Hardness::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, const vector<bool> &mask)
@@ -127,12 +117,12 @@ namespace TaskCommon
 		int encoded_size;
 		{
 			// create the image data matrix
-			jas_matrix_t *data(jas_matrix_create(info_.size_.cy, info_.size_.cx)); // rows then columns
+			jas_matrix_t *data(jas_matrix_create(size_.cy, size_.cx)); // rows then columns
 			{
 				size_t index(0);
-				for (LONG r(0); r != info_.size_.cy; ++r)
+				for (LONG r(0); r != size_.cy; ++r)
 				{
-					for (LONG c(0); c != info_.size_.cx; ++c)
+					for (LONG c(0); c != size_.cx; ++c)
 					{
 						jas_matrix_set(data, r, c, mask[index] ? 0 : data_[index]);
 						++index;
@@ -141,8 +131,8 @@ namespace TaskCommon
 			}
 			// initialize the image component structure
 			jas_image_cmptparm_t component;
-			component.width  = info_.size_.cx;
-			component.height = info_.size_.cy;
+			component.width  = size_.cx;
+			component.height = size_.cy;
 			component.tlx    = 0;
 			component.tly    = 0;
 			component.hstep  = 1;
@@ -155,10 +145,10 @@ namespace TaskCommon
 				MacroDisplayError(_T("jas_image_create failed"));
 			// fill the component of the image
 			jas_image_setcmpttype(image, 0, 0);
-			if (0 != jas_image_writecmpt(image, 0, 0, 0, info_.size_.cx, info_.size_.cy, data))
+			if (0 != jas_image_writecmpt(image, 0, 0, 0, size_.cx, size_.cy, data))
 				MacroDisplayError(_T("jas_imagewritecmpt failed"));
 			// create an output stream
-			size_t buffer_size(info_.size_.cx * info_.size_.cy);
+			size_t buffer_size(size_.cx * size_.cy);
 			jas_stream_t *stream = jas_stream_memopen(ri_cast<char*>(buffer), buffer_size);
 			if (0 == stream)
 				MacroDisplayError(_T("jas_stream_open failure"));
@@ -189,6 +179,23 @@ namespace TaskCommon
 		return encoded_size;
 	}
 
+	void Hardness::Save(LPCTSTR path)
+	{
+		_ASSERTE(NULL != data_);
+		// initialize the hardness image
+		fipImage image(
+			FIT_BITMAP,
+			static_cast<WORD>(size_.cx),
+			static_cast<WORD>(size_.cy),
+			8);
+		// fill the image
+		CopyMemory(image.accessPixels(), data_, size_.cx * size_.cy);
+		image.threshold(1);
+		// save the image
+		if (FALSE == image.save(path, BMP_DEFAULT))
+			MacroDisplayError(_T("Hardness map could not be saved."));
+	}
+
 	void Hardness::Unpack(TiXmlNode *node, BYTE *buffer, const vector<bool> &mask)
 	{
 		if (NULL == node)
@@ -198,7 +205,7 @@ namespace TaskCommon
 			return;
 		}
 		// allocate memory for the hardness
-		const size_t data_size(info_.size_.cx * info_.size_.cy);
+		const size_t data_size(size_.cx * size_.cy);
 		_ASSERTE(NULL == data_);
 		data_ = new BYTE[data_size];
 		// read in XML metadata
@@ -260,241 +267,78 @@ namespace TaskCommon
 			// extract image data
 			{
 				// get the data matrix
-				jas_matrix_t *data_matrix(jas_matrix_create(info_.size_.cy, info_.size_.cx));
+				jas_matrix_t *data_matrix(jas_matrix_create(size_.cy, size_.cx));
 				if (0 == data_matrix)
 					MacroDisplayError(_T("jas_matrix_create failed"));
-				if (0 > jas_image_readcmpt(image, 0, 0, 0, info_.size_.cx, info_.size_.cy, data_matrix))
+				if (0 > jas_image_readcmpt(image, 0, 0, 0, size_.cx, size_.cy, data_matrix))
 					MacroDisplayError(_T("jas_image_readcmpt failed"));
 				// extract image data,  0 where mask is true
 				BYTE *data_ptr(data_);
 				int mask_index(0);
-				for (LONG r(0); r != info_.size_.cy; ++r)
-					for (LONG c(0); c != info_.size_.cx; ++c)
+				for (LONG r(0); r != size_.cy; ++r)
+					for (LONG c(0); c != size_.cx; ++c)
 						*data_ptr++ = mask[mask_index++] ? 0 : static_cast<BYTE>(jas_matrix_get(data_matrix, r, c));
 			}
 		}
-	}
-
-	void Hardness::MakeDefault()
-	{
-		_ASSERTE(NULL == data_);
-		const size_t data_size(info_.size_.cx * info_.size_.cy);
-		data_ = new BYTE[data_size];
-		FillMemory(data_, data_size, 0xFF);
-	}
-
-	void Hardness::Save()
-	{
-		using namespace Loki;
-		SaveBegin();
-		LOKI_ON_BLOCK_EXIT_OBJ(*this, &Hardness::SaveEnd);
-		SaveAs(info_.path_.c_str());
-	}
-
-	void Hardness::SaveAs(LPCTSTR path)
-	{
-		_ASSERTE(NULL != data_);
-		// initialize the hardness image
-		fipImage image(
-			FIT_BITMAP,
-			static_cast<WORD>(info_.size_.cx),
-			static_cast<WORD>(info_.size_.cy),
-			8);
-		// fill the image
-		CopyMemory(image.accessPixels(), data_, info_.size_.cx * info_.size_.cy);
-		image.threshold(1);
-		// save the image
-		if (FALSE == image.save(path, BMP_DEFAULT))
-			MacroDisplayError(_T("Hardness map could not be saved."));
 	}
 
 	//-------------------------
 	// Heightmap implementation
 	//-------------------------
 
-	Heightmap::info_t::info_t()
-		:path_      ()
-		,size_      ()
-		,zero_level_(0)
-		,zero_layer_(NULL)
-	{}
-
-	Heightmap::Heightmap(const HWND &error_hwnd)
-		:ErrorHandler(error_hwnd)
-		,SaveCallback(RS_HEIGHTMAP)
-		,bpp_   (0)
-		,data8_ (NULL)
-		,data16_(NULL)
+	Heightmap::Heightmap(WORD bpp, ErrorHandler &error_handler)
+		:ErrorHandler(error_handler)
+		,bpp_(bpp)
 	{}
 
 	Heightmap::~Heightmap()
+	{}
+
+	WORD Heightmap::GetBpp() const
 	{
-		if (NULL != data8_)
-			delete [] data8_;
-		if (NULL != data16_)
-			delete [] data16_;
-		data8_  = NULL;
-		data16_ = NULL;
+		return bpp_;
 	}
 
-	bool Heightmap::Load()
+	//--------------------------
+	// Heightmap8 implementation
+	//--------------------------
+
+	Heightmap8::Heightmap8(SIZE size, ErrorHandler &error_handler)
+		:Heightmap(8, error_handler)
+		,data_(NULL)
 	{
-		fipImage image;
-		// load the image
-		{
-			const DWORD delay(256);
-			const uint  try_count(32);
-			uint        try_num(0);
-			for (; try_num != try_count; ++try_num)
-			{
-				image.load(info_.path_.c_str());
-				if (TRUE == image.isValid())
-					break;
-				else
-					Sleep(delay);
-			}
-			if (try_count == try_num)
-			{
-				MacroDisplayError(_T("Heightmap could not be loaded."));
-				return NULL;
-			}
-		}
-		// make sure that dimensions are correct
-		if (image.getWidth() != info_.size_.cx || image.getHeight() != info_.size_.cy)
-		{
-			MacroDisplayError(_T("Heightmap dimensions do not correspond to project settings."));
-			return NULL;
-		}
-		size_.cx = info_.size_.cx + 1;
-		size_.cy = info_.size_.cy + 1;
-		// flip the image vertically
-		if (FALSE == image.flipVertical())
-			MacroDisplayError(_T("Heightmap bitmap could not be flipped."));
-		// turn the image to grayscale, if necessary, and initialize the bitmap
-		bpp_ = image.getBitsPerPixel();
-		if (8 != bpp_ && 16 != bpp_)
-		{
-			if (FALSE == image.convertToGrayscale())
-			{
-				MacroDisplayError(_T("Heightmap could not be converted to grayscale."));
-				return NULL;
-			}
-			bpp_ = 8;
-		}
-		switch (bpp_)
-		{
-		case 8:  return Load8 (image);
-		case 16: return Load16(image);
-		}
-		return false;
+		size_.cx = size.cx + 1;
+		size_.cy = size.cy + 1;
 	}
 
-	void Heightmap::Unload()
+	Heightmap8::~Heightmap8()
 	{
-		//Save();
-		switch (bpp_)
-		{
-		case 8:
-			delete [] data8_;
-			data8_ = NULL;
-			break;
-		case 16:
-			delete [] data16_;
-			data16_ = NULL;
-			break;
-		}
+		delete [] data_;
 	}
 
-	void Heightmap::Unpack(TiXmlNode *node, BYTE *buffer, vector<bool> &mask)
+	void Heightmap8::MakeDefault()
 	{
-		bpp_ = 8;
-		size_.cx = info_.size_.cx + 1;
-		size_.cy = info_.size_.cy + 1;
-		TiXmlHandle node_handle(node);
-		TiXmlText *bpp_node(node_handle.FirstChildElement("bpp").FirstChild().Text());
-		if (NULL != bpp_node)
+		const size_t data_size(size_.cx * size_.cy);
+		if (NULL == data_)
 		{
-			if (0 == strcmp(bpp_node->Value(), "16"))
-				bpp_ = 16;
+			data_ = new BYTE[data_size];
 		}
-		switch (bpp_)
-		{
-		case 8:
-			Unpack8(node, buffer, mask);
-			break;
-		case 16:
-			Unpack16(node, buffer, mask);
-			break;
-		}
+		ZeroMemory(data_, data_size);
 	}
 
-	int Heightmap::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask)
-	{
-		switch (bpp_)
-		{
-		case 8:  return Pack8 (node, buffer, initial_offset, mask);
-		case 16: return Pack16(node, buffer, initial_offset, mask);
-		}
-		_ASSERT(false);
-		return -1;
-	}
-
-	void Heightmap::MakeDefault()
-	{
-		switch (bpp_)
-		{
-		case 8:  MakeDefault8 (); break;
-		case 16: MakeDefault16(); break;
-		}
-	}
-
-	void Heightmap::Save()
-	{
-		using namespace Loki;
-		SaveBegin();
-		LOKI_ON_BLOCK_EXIT_OBJ(*this, &Heightmap::SaveEnd);
-		SaveAs(info_.path_.c_str());
-	}
-
-	void Heightmap::SaveAs(LPCTSTR path)
-	{
-		// initialize the heightmap image
-		fipImage image(
-			FIT_BITMAP,
-			static_cast<WORD>(info_.size_.cx),
-			static_cast<WORD>(info_.size_.cy),
-			static_cast<WORD>(bpp_));
-		// fill the image
-		switch (bpp_)
-		{
-		case 8:
-			CopyMemory(image.accessPixels(), data8_, info_.size_.cx * info_.size_.cy);
-			break;
-		case 16:
-			CopyMemory(image.accessPixels(), data16_, info_.size_.cx * info_.size_.cy * 2);
-			break;
-		default:
-			MacroDisplayError("Invalid heightmap BPP.");
-			return;
-		}
-		// save the image
-		if (FALSE == image.save(path, 0))
-			MacroDisplayError(_T("Heightmap could not be saved."));
-	}
-
-	bool Heightmap::Load8(fipImage &image)
+	bool Heightmap8::Load(fipImage &image, const ZeroLayer *zero_layer, uint zero_level)
 	{
 		_ASSERTE(8 == image.getBitsPerPixel());
 		// set memory for the heightmap
 		{
 			// allocate
 			const size_t data_size(size_.cx * size_.cy);
-			_ASSERTE(NULL == data8_);
-			data8_ = new BYTE[data_size];
+			_ASSERTE(NULL == data_);
+			data_ = new BYTE[data_size];
 			// copy data
 			{
 				const BYTE *image_iter(image.accessPixels());
-				BYTE *heightmap_iter(data8_);
+				BYTE *heightmap_iter(data_);
 				for (LONG r(0); r != size_.cy - 1; ++r)
 				{
 					CopyMemory(heightmap_iter, image_iter, size_.cx - 1);
@@ -509,20 +353,23 @@ namespace TaskCommon
 			}
 		}
 		// scale the heightmap vertically where zero layer is levelled, and nearby
-		if (NULL != info_.zero_layer_)
+		if (NULL != zero_layer)
 		{
-			const ZeroLayer &zero_layer(*info_.zero_layer_);
+			const ZeroLayer &zero_layer(*zero_layer);
+			_ASSERTE(zero_layer.size_.cx == size_.cx - 1);
+			_ASSERTE(zero_layer.size_.cy == size_.cy - 1);
+			_ASSERTE(static_cast<LONG>(zero_layer.data_.size()) == zero_layer.size_.cx * zero_layer.size_.cy);
 			// convert the zero layer into a float array, and blur the array
 			const size_t size(zero_layer.data_.size());
 			vector<ushort> blurred_zero_layer(size);
 			for (size_t i(0); i != size; ++i)
 				blurred_zero_layer[i] = zero_layer.data_[i] ? 0xFFFF : 0x0000;
-			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), size_);
-			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), size_);
-			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), size_);
+			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), zero_layer.size_);
+			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), zero_layer.size_);
+			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), zero_layer.size_);
 			// scale the heightmap
 			vector<ushort>::const_iterator bzl_iter (blurred_zero_layer.begin());
-			BYTE *                        data_iter(data8_);
+			BYTE *                        data_iter(data_);
 			for (LONG y(0); y != size_.cy - 1; ++y)
 			{
 				for (LONG x(0); x != size_.cx - 1; ++x)
@@ -533,7 +380,7 @@ namespace TaskCommon
 					// scale the pixel (optimized to avoid fp ops)
 					uint scale(23);
 					uint ratio((v << scale) / 0xFF);
-					*data_iter = static_cast<BYTE>((*data_iter * ratio + info_.zero_level_ * ((1 << scale) - ratio)) >> scale);
+					*data_iter = static_cast<BYTE>((*data_iter * ratio + zero_level * ((1 << scale) - ratio)) >> scale);
 					++data_iter;
 					++bzl_iter;
 				}
@@ -543,87 +390,9 @@ namespace TaskCommon
 		return true;
 	}
 
-	bool Heightmap::Load16(fipImage &image)
+	int Heightmap8::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask)
 	{
-		_ASSERTE(16 == image.getBitsPerPixel());
-		// set memory for the heightmap
-		{
-			// allocate
-			const size_t data_size(size_.cx * size_.cy);
-			_ASSERTE(NULL == data16_);
-			data16_ = new WORD[data_size];
-			// copy data
-			{
-				const WORD *image_iter(ri_cast<WORD*>(image.accessPixels()));
-				WORD *heightmap_iter(data16_);
-				for (LONG r(0); r != size_.cy - 1; ++r)
-				{
-					for (LONG c(0); c != size_.cx - 1; ++c)
-						*heightmap_iter++ = *image_iter++ >> 3; // we really need only 13-bit maps
-					// pad horizontally
-					*heightmap_iter = *(image_iter - 1);
-					++heightmap_iter;
-				}
-				// pad vertically
-				CopyMemory(heightmap_iter, heightmap_iter - size_.cx, size_.cx * 2);
-			}
-		}
-		// scale the heightmap vertically where zero layer is levelled, and nearby
-		if (NULL != info_.zero_layer_)
-		{
-			const ZeroLayer &zero_layer(*info_.zero_layer_);
-			// convert the zero layer into a float array, and blur the array
-			const size_t size(zero_layer.data_.size());
-			vector<ushort> blurred_zero_layer(size);
-			for (size_t i(0); i != size; ++i)
-				blurred_zero_layer[i] = zero_layer.data_[i] ? 0xFFFF : 0x0000;
-			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), size_);
-			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), size_);
-			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), size_);
-			// adjust info_.zero_level_ to the higher bpp
-			info_.zero_level_ *= 32;
-			// scale the heightmap
-			vector<ushort>::const_iterator  bzl_iter (blurred_zero_layer.begin());
-			WORD                           *data_iter(data16_);
-			for (LONG y(0); y != size_.cy - 1; ++y)
-			{
-				for (LONG x(0); x != size_.cx - 1; ++x)
-				{
-					// make sure the blur only expands the black areas
-					uint v(*bzl_iter);
-					v = (0 == (v & 0x8000)) ? 0 : 0xFF & v >> 7;
-					// scale the pixel (optimized to avoid fp ops)
-					unsigned __int64 scale(23);
-					unsigned __int64 ratio((v << scale) / 0xFF);
-					*data_iter = static_cast<WORD>((*data_iter * ratio + info_.zero_level_ * ((1 << scale) - ratio)) >> scale);
-					++data_iter;
-					++bzl_iter;
-				}
-				++data_iter;
-			}
-		}
-		return true;
-	}
-
-	void Heightmap::MakeDefault8()
-	{
-		const size_t data_size(info_.size_.cx * info_.size_.cy);
-		if (NULL == data8_)
-			data8_ = new BYTE[data_size];
-		ZeroMemory(data8_, data_size);
-	}
-
-	void Heightmap::MakeDefault16()
-	{
-		const size_t data_size(info_.size_.cx * info_.size_.cy);
-		if (NULL == data16_)
-			data16_ = new WORD[data_size];
-		ZeroMemory(data16_, data_size * 2);
-	}
-
-	int Heightmap::Pack8(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask)
-	{
-		SIZE map_size = { info_.size_.cx - 1, info_.size_.cy - 1 };
+		SIZE map_size = { size_.cx - 1, size_.cy - 1 };
 		mask.reserve(map_size.cx * map_size.cy);
 		// pack heightmap itself
 		int encoded_size;
@@ -636,8 +405,8 @@ namespace TaskCommon
 				{
 					for (LONG c(0); c != map_size.cx; ++c)
 					{
-						jas_matrix_set(data, r, c, data8_[index]);
-						mask.push_back(0 == data8_[index]);
+						jas_matrix_set(data, r, c, data_[index]);
+						mask.push_back(0 == data_[index]);
 						++index;
 					}
 					++index; // skip padding
@@ -691,7 +460,6 @@ namespace TaskCommon
 						mask_buffer[i] |= 1 << b;
 			CopyMemory(buffer + encoded_size, mask_buffer, mask_size);
 			delete [] mask_buffer;
-			mask_buffer = NULL;
 		}
 
 		// record xml metadata
@@ -713,107 +481,13 @@ namespace TaskCommon
 		return encoded_size + mask_size;
 	}
 
-	int Heightmap::Pack16(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask)
+	void Heightmap8::Unpack(TiXmlNode *node, BYTE *buffer, vector<bool> &mask)
 	{
-		SIZE map_size = { info_.size_.cx - 1, info_.size_.cy - 1 };
-		mask.reserve(map_size.cx * map_size.cy);
-		// pack heightmap itself
-		int encoded_size;
-		{
-			// create the image data matrix
-			jas_matrix_t *data(jas_matrix_create(map_size.cy, map_size.cx)); // rows then columns
-			{
-				size_t index(0);
-				for (LONG r(0); r != map_size.cy; ++r)
-				{
-					for (LONG c(0); c != map_size.cx; ++c)
-					{
-						WORD value(data16_[index]);
-						jas_matrix_set(data, r, c, value);
-						mask.push_back(0 == data16_[index]);
-						++index;
-					}
-					++index; // skip padding
-				}
-			} 
-			// initialize the image component structure
-			jas_image_cmptparm_t component;
-			component.width  = map_size.cx;
-			component.height = map_size.cy;
-			component.tlx    = 0;
-			component.tly    = 0;
-			component.hstep  = 1;
-			component.vstep  = 1;
-			component.prec   = 13;
-			component.sgnd   = false;
-			// create the image
-			jas_image_t *image(jas_image_create(1, &component, JAS_CLRSPC_SGRAY));
-			if (0 == image)
-				MacroDisplayError(_T("jas_image_create failed"));
-			// fill the component of the image
-			jas_image_setcmpttype(image, 0, 0);
-			if (0 != jas_image_writecmpt(image, 0, 0, 0, map_size.cx, map_size.cy, data))
-				MacroDisplayError(_T("jas_imagewritecmpt failed"));
-			// create an output stream
-			size_t buffer_size(map_size.cx * map_size.cy);
-			jas_stream_t *stream = jas_stream_memopen(ri_cast<char*>(buffer), buffer_size);
-			if (0 == stream)
-				MacroDisplayError(_T("jas_stream_open failure"));
-			// encode and write the image into the stream
-			int format = jas_image_strtofmt("jpc");
-			if (-1 == format)
-				MacroDisplayError(_T("jas_image_strtofmt failed"));
-			if (0 != jas_image_encode(image, stream, format, "mode=real rate=0.1"))
-				MacroDisplayError(_T("jas_image_encode failed"));
-			encoded_size = stream->rwcnt_;
-			// clean up
-			jas_stream_close(stream);
-			jas_image_destroy(image);
-			jas_matrix_destroy(data);
-		}
-		// pack the mask
-		_ASSERTE(mask.size() % 8 == 0);
-		const int mask_size(mask.size() / 8);
-		{
-			BYTE *mask_buffer(new BYTE[mask_size]);
-			ZeroMemory(mask_buffer, mask_size);
-			int bit_index(0);
-			for (int i(0); i != mask_size; ++i)
-				for (int b(0); b != 8; ++b)
-					if (mask[bit_index++])
-						mask_buffer[i] |= 1 << b;
-			CopyMemory(buffer + encoded_size, mask_buffer, mask_size);
-			delete [] mask_buffer;
-			mask_buffer = NULL;
-		}
-		// record xml metadata
-		{
-			char str[16];
-			// 16-bit marker
-			node.InsertEndChild(TiXmlElement("bpp"))->InsertEndChild(TiXmlText("16"));
-			// compression format
-			node.InsertEndChild(TiXmlElement("compression"))->InsertEndChild(TiXmlText("JPC"));
-			// offset of compressed heightmap data
-			_itot(buffer - initial_offset, str, 10);
-			node.InsertEndChild(TiXmlElement("offset"))->InsertEndChild(TiXmlText(str));
-			// size of compressed heightmap data
-			_itot(encoded_size, str, 10);
-			node.InsertEndChild(TiXmlElement("size"))->InsertEndChild(TiXmlText(str));
-			// offset of the null point mask
-			_itot(buffer - initial_offset + encoded_size, str, 10);
-			node.InsertEndChild(TiXmlElement("mask_offset"))->InsertEndChild(TiXmlText(str));
-		}
-
-		return encoded_size + mask_size;
-	}
-
-	void Heightmap::Unpack8(TiXmlNode *node, BYTE *buffer, vector<bool> &mask)
-	{
-		SIZE map_size = { info_.size_.cx, info_.size_.cy };
+		SIZE map_size = { size_.cx - 1, size_.cy - 1 };
 		// allocate memory for the heightmap
 		const size_t data_size(size_.cx * size_.cy);
-		_ASSERTE(NULL == data8_);
-		data8_ = new BYTE[data_size];
+		_ASSERTE(NULL == data_);
+		data_ = new BYTE[data_size];
 		// read in XML metadata
 		size_t compressed_heightmap_size;
 		BYTE *compressed_heightmap;
@@ -894,7 +568,7 @@ namespace TaskCommon
 				if (0 > jas_image_readcmpt(image, 0, 0, 0, map_size.cx, map_size.cy, data_matrix))
 					MacroDisplayError(_T("jas_image_readcmpt failed"));
 				// extract image data, with padding, and 0 where mask is true
-				BYTE *data_ptr(data8_);
+				BYTE *data_ptr(data_);
 				int mask_index(0);
 				for (LONG r(0); r != map_size.cy; ++r)
 				{
@@ -909,13 +583,199 @@ namespace TaskCommon
 		}
 	}
 
-	void Heightmap::Unpack16(TiXmlNode *node, BYTE *buffer, vector<bool> &mask)
+	//---------------------------
+	// Heightmap16 implementation
+	//---------------------------
+
+	Heightmap16::Heightmap16(SIZE size, ErrorHandler &error_handler)
+		:Heightmap(16, error_handler)
+		,data_(NULL)
 	{
-		SIZE map_size = { info_.size_.cx, info_.size_.cy };
+		size_.cx = size.cx + 1;
+		size_.cy = size.cy + 1;
+	}
+
+	Heightmap16::~Heightmap16()
+	{
+		delete [] data_;
+	}
+
+	void Heightmap16::MakeDefault()
+	{
+		const size_t data_size(size_.cx * size_.cy);
+		if (NULL == data_)
+		{
+			data_ = new WORD[data_size];
+		}
+		ZeroMemory(data_, data_size * 2);
+	}
+
+	bool Heightmap16::Load(fipImage &image, const ZeroLayer *zero_layer, uint zero_level)
+	{
+		_ASSERTE(16 == image.getBitsPerPixel());
+		// set memory for the heightmap
+		{
+			// allocate
+			const size_t data_size(size_.cx * size_.cy);
+			_ASSERTE(NULL == data_);
+			data_ = new WORD[data_size];
+			// copy data
+			{
+				const WORD *image_iter(ri_cast<WORD*>(image.accessPixels()));
+				WORD *heightmap_iter(data_);
+				for (LONG r(0); r != size_.cy - 1; ++r)
+				{
+					for (LONG c(0); c != size_.cx - 1; ++c)
+						*heightmap_iter++ = *image_iter++ >> 3; // we really need only 13-bit maps
+					// pad horizontally
+					*heightmap_iter = *(image_iter - 1);
+					++heightmap_iter;
+				}
+				// pad vertically
+				CopyMemory(heightmap_iter, heightmap_iter - size_.cx, size_.cx * 2);
+			}
+		}
+		// scale the heightmap vertically where zero layer is levelled, and nearby
+		if (NULL != zero_layer)
+		{
+			const ZeroLayer &zero_layer(*zero_layer);
+			_ASSERTE(zero_layer.size_.cx == size_.cx - 1);
+			_ASSERTE(zero_layer.size_.cy == size_.cy - 1);
+			_ASSERTE(static_cast<LONG>(zero_layer.data_.size()) == zero_layer.size_.cx * zero_layer.size_.cy);
+			// convert the zero layer into a float array, and blur the array
+			const size_t size(zero_layer.data_.size());
+			vector<ushort> blurred_zero_layer(size);
+			for (size_t i(0); i != size; ++i)
+				blurred_zero_layer[i] = zero_layer.data_[i] ? 0xFFFF : 0x0000;
+			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), zero_layer.size_);
+			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), zero_layer.size_);
+			GaussianBlur<ushort, int>(&*blurred_zero_layer.begin(), zero_layer.size_);
+			// adjust zero_level to the higher bpp
+			zero_level *= 32;
+			// scale the heightmap
+			vector<ushort>::const_iterator  bzl_iter (blurred_zero_layer.begin());
+			WORD                           *data_iter(data_);
+			for (LONG y(0); y != size_.cy - 1; ++y)
+			{
+				for (LONG x(0); x != size_.cx - 1; ++x)
+				{
+					// make sure the blur only expands the black areas
+					uint v(*bzl_iter);
+					v = (0 == (v & 0x8000)) ? 0 : 0xFF & v >> 7;
+					// scale the pixel (optimized to avoid fp ops)
+					unsigned __int64 scale(23);
+					unsigned __int64 ratio((v << scale) / 0xFF);
+					*data_iter = static_cast<WORD>((*data_iter * ratio + zero_level * ((1 << scale) - ratio)) >> scale);
+					++data_iter;
+					++bzl_iter;
+				}
+				++data_iter;
+			}
+		}
+		return true;
+	}
+
+	int Heightmap16::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask)
+	{
+		SIZE map_size = { size_.cx - 1, size_.cy - 1 };
+		mask.reserve(map_size.cx * map_size.cy);
+		// pack heightmap itself
+		int encoded_size;
+		{
+			// create the image data matrix
+			jas_matrix_t *data(jas_matrix_create(map_size.cy, map_size.cx)); // rows then columns
+			{
+				size_t index(0);
+				for (LONG r(0); r != map_size.cy; ++r)
+				{
+					for (LONG c(0); c != map_size.cx; ++c)
+					{
+						WORD value(data_[index]);
+//						value = ((value & 0xFF) << 8) | (value >> 8);
+						jas_matrix_set(data, r, c, value);
+						mask.push_back(0 == data_[index]);
+						++index;
+					}
+					++index; // skip padding
+				}
+			} 
+			// initialize the image component structure
+			jas_image_cmptparm_t component;
+			component.width  = map_size.cx;
+			component.height = map_size.cy;
+			component.tlx    = 0;
+			component.tly    = 0;
+			component.hstep  = 1;
+			component.vstep  = 1;
+			component.prec   = 13;
+			component.sgnd   = false;
+			// create the image
+			jas_image_t *image(jas_image_create(1, &component, JAS_CLRSPC_SGRAY));
+			if (0 == image)
+				MacroDisplayError(_T("jas_image_create failed"));
+			// fill the component of the image
+			jas_image_setcmpttype(image, 0, 0);
+			if (0 != jas_image_writecmpt(image, 0, 0, 0, map_size.cx, map_size.cy, data))
+				MacroDisplayError(_T("jas_imagewritecmpt failed"));
+			// create an output stream
+			size_t buffer_size(map_size.cx * map_size.cy);
+			jas_stream_t *stream = jas_stream_memopen(ri_cast<char*>(buffer), buffer_size);
+			if (0 == stream)
+				MacroDisplayError(_T("jas_stream_open failure"));
+			// encode and write the image into the stream
+			int format = jas_image_strtofmt("jpc");
+			if (-1 == format)
+				MacroDisplayError(_T("jas_image_strtofmt failed"));
+			if (0 != jas_image_encode(image, stream, format, "mode=real rate=0.1"))
+				MacroDisplayError(_T("jas_image_encode failed"));
+			encoded_size = stream->rwcnt_;
+			// clean up
+			jas_stream_close(stream);
+			jas_image_destroy(image);
+			jas_matrix_destroy(data);
+		}
+		// pack the mask
+		_ASSERTE(mask.size() % 8 == 0);
+		const int mask_size(mask.size() / 8);
+		{
+			BYTE *mask_buffer(new BYTE[mask_size]);
+			ZeroMemory(mask_buffer, mask_size);
+			int bit_index(0);
+			for (int i(0); i != mask_size; ++i)
+				for (int b(0); b != 8; ++b)
+					if (mask[bit_index++])
+						mask_buffer[i] |= 1 << b;
+			CopyMemory(buffer + encoded_size, mask_buffer, mask_size);
+			delete [] mask_buffer;
+		}
+		// record xml metadata
+		{
+			char str[16];
+			// 16-bit marker
+			node.InsertEndChild(TiXmlElement("bpp"))->InsertEndChild(TiXmlText("16"));
+			// compression format
+			node.InsertEndChild(TiXmlElement("compression"))->InsertEndChild(TiXmlText("JPC"));
+			// offset of compressed heightmap data
+			_itot(buffer - initial_offset, str, 10);
+			node.InsertEndChild(TiXmlElement("offset"))->InsertEndChild(TiXmlText(str));
+			// size of compressed heightmap data
+			_itot(encoded_size, str, 10);
+			node.InsertEndChild(TiXmlElement("size"))->InsertEndChild(TiXmlText(str));
+			// offset of the null point mask
+			_itot(buffer - initial_offset + encoded_size, str, 10);
+			node.InsertEndChild(TiXmlElement("mask_offset"))->InsertEndChild(TiXmlText(str));
+		}
+
+		return encoded_size + mask_size;
+	}
+
+	void Heightmap16::Unpack(TiXmlNode *node, BYTE *buffer, vector<bool> &mask)
+	{
+		SIZE map_size = { size_.cx - 1, size_.cy - 1 };
 		// allocate memory for the heightmap
 		const size_t data_size(size_.cx * size_.cy);
-		_ASSERTE(NULL == data16_);
-		data16_ = new WORD[data_size];
+		_ASSERTE(NULL == data_);
+		data_ = new WORD[data_size];
 		// read in XML metadata
 		size_t compressed_heightmap_size;
 		BYTE *compressed_heightmap;
@@ -996,7 +856,7 @@ namespace TaskCommon
 				if (0 > jas_image_readcmpt(image, 0, 0, 0, map_size.cx, map_size.cy, data_matrix))
 					MacroDisplayError(_T("jas_image_readcmpt failed"));
 				// extract image data, with padding, and 0 where mask is true
-				WORD *data_ptr(data16_);
+				WORD *data_ptr(data_);
 				int mask_index(0);
 				fipImage image(FIT_UINT16, static_cast<WORD>(map_size.cx), static_cast<WORD>(map_size.cy), 16);
 				WORD *image_data(ri_cast<WORD*>(image.accessPixels()));
@@ -1008,6 +868,7 @@ namespace TaskCommon
 						else
 						{
 							WORD value(static_cast<WORD>(jas_matrix_get(data_matrix, r, c)));
+//							value = ((value & 0xFF) << 8) | (value >> 8);
 							*image_data++ = value;
 							*data_ptr++ = value;
 						}
@@ -1020,35 +881,167 @@ namespace TaskCommon
 		}
 	}
 
+	Heightmap16::operator TaskCommon::Heightmap8*()
+	{
+		Heightmap8 *heightmap8;
+		{
+			SIZE map_size = { size_.cx - 1, size_.cy - 1 };
+			heightmap8 = new Heightmap8(map_size, *this);
+			heightmap8->data_ = new BYTE[size_.cx * size_.cy];
+		}
+		const size_t data_size(size_.cx * size_.cy);
+		const WORD *        data16    (data_);
+		const WORD * const  data16_end(data16 + data_size);
+		BYTE *              data8     (heightmap8->data_);
+		while (data16 != data16_end)
+			*data8++ = static_cast<BYTE>(*data16++ >> 5);
+		return heightmap8;
+	}
+
+	//---------------------------
+	// heightmap helper functions
+	//---------------------------
+
+	Heightmap* LoadHeightmap(
+			SIZE             size,
+			ErrorHandler    &error_handler,
+			LPCTSTR          path,
+			const ZeroLayer *zero_layer,
+			uint             zero_level)
+	{
+		Heightmap *heightmap(NULL);
+		fipImage image;
+		// load the image
+		{
+			const DWORD delay(256);
+			const uint  try_count(32);
+			uint        try_num(0);
+			for (; try_num != try_count; ++try_num)
+			{
+				image.load(path);
+				if (TRUE == image.isValid())
+					break;
+				else
+					Sleep(delay);
+			}
+			if (try_count == try_num)
+			{
+				error_handler.MacroDisplayError(_T("Heightmap could not be loaded."));
+				return NULL;
+			}
+		}
+		// make sure that dimensions are correct
+		if (image.getWidth() != size.cx || image.getHeight() != size.cy)
+		{
+			error_handler.MacroDisplayError(_T("Heightmap dimensions do not correspond to project settings."));
+			return NULL;
+		}
+		// flip the image vertically
+		if (FALSE == image.flipVertical())
+			error_handler.MacroDisplayError(_T("Heightmap bitmap could not be flipped."));
+		// turn the image to grayscale, if necessary, and initialize the bitmap
+		{
+			WORD bpp = image.getBitsPerPixel();
+			if (8 != bpp && 16 != bpp)
+			{
+				if (FALSE == image.convertToGrayscale())
+				{
+					error_handler.MacroDisplayError(_T("Heightmap could not be converted to grayscale."));
+					return NULL;
+				}
+				bpp = 8;
+			}
+			switch (bpp)
+			{
+			case 8:
+				{
+					Heightmap8 *heightmap8(new Heightmap8(size, error_handler));
+					if (!heightmap8->Load(image, zero_layer, zero_level))
+					{
+						delete heightmap8;
+						return NULL;
+					}
+					heightmap = heightmap8;
+				} break;
+			case 16:
+				{
+					Heightmap16 *heightmap16(new Heightmap16(size, error_handler));
+					if (!heightmap16->Load(image, zero_layer, zero_level))
+					{
+						delete heightmap16;
+						return NULL;
+					}
+					heightmap = heightmap16;
+				} break;
+			}
+		}
+		return heightmap;
+	}
+
+	Heightmap* UnpackHeightmap(
+		SIZE size,
+		ErrorHandler &error_handler,
+		TiXmlNode *node,
+		BYTE *buffer,
+		vector<bool> &mask)
+	{
+		Heightmap *heightmap(NULL);
+		WORD bpp(8);
+		TiXmlHandle node_handle(node);
+		TiXmlText *bpp_node(node_handle.FirstChildElement("bpp").FirstChild().Text());
+		if (NULL != bpp_node)
+		{
+			if (0 == strcmp(bpp_node->Value(), "16"))
+				bpp = 16;
+		}
+		switch (bpp)
+		{
+		case 8:
+			{
+				Heightmap8 *heightmap8(new Heightmap8(size, error_handler));
+				heightmap8->Unpack(node, buffer, mask);
+				heightmap = heightmap8;
+			} break;
+		case 16:
+			{
+				Heightmap16 *heightmap16(new Heightmap16(size, error_handler));
+				heightmap16->Unpack(node, buffer, mask);
+				heightmap = heightmap16;
+			} break;
+		}
+		return heightmap;
+	}
+
 	//------------------------
 	// Lightmap implementation
 	//------------------------
 
-	Lightmap::Lightmap(const HWND &error_hwnd)
+	Lightmap::Lightmap(SIZE size, HWND &error_hwnd)
 		:ErrorHandler(error_hwnd)
 		,data_(NULL)
+		,size_(size)
 	{}
 
 	Lightmap::~Lightmap()
 	{
-		if (NULL != data_)
-			delete [] data_;
-		data_ = NULL;
+		delete [] data_;
 	}
 
 	
 	bool Lightmap::Create(const Heightmap &heightmap)
 	{
-		size_ = heightmap.info_.size_;
-		switch (heightmap.bpp_)
+		_ASSERTE(
+			size_.cx + 1 == heightmap.size_.cx &&
+			size_.cy + 1 == heightmap.size_.cy);
+		switch (heightmap.GetBpp())
 		{
-		case 8:  return Create8 (heightmap);
-		case 16: return Create16(heightmap);
+		case 8:  return Create(ri_cast<const Heightmap8&> (heightmap));
+		case 16: return Create(ri_cast<const Heightmap16&>(heightmap));
 		}
 		return false;
 	}
 
-	bool Lightmap::Create8(const Heightmap &heightmap)
+	bool Lightmap::Create(const Heightmap8 &heightmap)
 	{
 		// precalculate surface-sun dot products
 		BYTE surface_sun_dot[0x100];
@@ -1070,7 +1063,7 @@ namespace TaskCommon
 		_ASSERTE(NULL == data_);
 		data_ = new BYTE[data_size];
 		// calculate lighting
-		const BYTE *hi(heightmap.data8_); // heightmap iterator
+		const BYTE *hi(heightmap.data_); // heightmap iterator
 		BYTE *li(data_); // lightmap iterator
 		for (LONG r(0); r != size_.cy; ++r)
 		{
@@ -1104,7 +1097,7 @@ namespace TaskCommon
 		return true;
 	}
 
-	bool Lightmap::Create16(const Heightmap &heightmap)
+	bool Lightmap::Create(const Heightmap16 &heightmap)
 	{
 		// precalculate surface-sun dot products
 		BYTE surface_sun_dot[0x400];
@@ -1126,7 +1119,7 @@ namespace TaskCommon
 		_ASSERTE(NULL == data_);
 		data_ = new BYTE[data_size];
 		// calculate lighting
-		const WORD * hi(heightmap.data16_); // heightmap iterator
+		const WORD * hi(heightmap.data_); // heightmap iterator
 		BYTE       * li(data_); // lightmap iterator
 		for (LONG r(0); r != size_.cy; ++r)
 		{
@@ -1352,27 +1345,25 @@ namespace TaskCommon
 	// Script implementation
 	//----------------------
 
-	Script::Script(const HWND &error_hwnd)
+	Script::Script(HWND &error_hwnd)
 		:ErrorHandler(error_hwnd)
-		,SaveCallback(RS_SCRIPT)
 	{}
 
-	bool Script::Load()
+	bool Script::Load(LPCTSTR path)
 	{
-		if (false == doc_.LoadFile(info_.path_))
+		if (false == doc_.LoadFile(path))
 			return false;
 		return true;
-	}
-
-	void Script::Unload()
-	{
-		Save();
-		doc_.Clear();
 	}
 
 	void Script::Pack(TiXmlNode &node) const
 	{
 		node.InsertEndChild(*doc_.RootElement());
+	}
+
+	void Script::Save(LPCTSTR path) const
+	{
+		doc_.SaveFile(path);
 	}
 
 	bool Script::Unpack(TiXmlNode &node)
@@ -1386,51 +1377,31 @@ namespace TaskCommon
 		return true;
 	}
 
-	void Script::Save() const
-	{
-		using namespace Loki;
-		SaveBegin();
-		LOKI_ON_BLOCK_EXIT_OBJ(*this, &Script::SaveEnd);
-		SaveAs(info_.path_.c_str());
-	}
-
-	void Script::SaveAs(LPCTSTR path) const
-	{
-		doc_.SaveFile(info_.path_);
-	}
-
 	//-------------------
 	// Sky implementation
 	//-------------------
 
 	const SIZE Sky::size_ = { 0x200, 0x200 };
 
-	Sky::info_t::info_t()
-		:path_()
-	{}
-
-	Sky::Sky(const HWND &error_hwnd)
+	Sky::Sky(HWND &error_hwnd)
 		:ErrorHandler(error_hwnd)
-		,SaveCallback(RS_SKY)
-		,pixels_(NULL)
+		,pixels_    (NULL)
 	{}
 
 	Sky::~Sky()
 	{
-		if (NULL != pixels_)
-			delete [] pixels_;
-		pixels_ = NULL;
+		delete [] pixels_;
 	}
 
-	bool Sky::Load()
+	bool Sky::Load(LPCTSTR path)
 	{
 		fipImage image;
 		// load the image
-		image.load(info_.path_.c_str());
+		image.load(path);
 		if (FALSE == image.isValid())
 		{
 			Sleep(512);
-			image.load(info_.path_.c_str());
+			image.load(path);
 			if (FALSE == image.isValid())
 			{
 				MakeDefault();
@@ -1470,12 +1441,13 @@ namespace TaskCommon
 		return true;
 	}
 
-	void Sky::Unload()
+	void Sky::MakeDefault()
 	{
-		_ASSERTE(NULL != pixels_);
-		//Save();
-		delete [] pixels_;
-		pixels_ = NULL;
+		_ASSERTE(NULL == pixels_);
+		const size_t pixels_size(size_.cx * size_.cy);
+		const size_t buffer_size (pixels_size * sizeof(COLORREF));
+		pixels_ = new COLORREF[pixels_size];
+		UncompressResource(IDR_SKY_TX, ri_cast<BYTE*>(pixels_), buffer_size);
 	}
 
 	int Sky::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset) const
@@ -1491,6 +1463,25 @@ namespace TaskCommon
 			node.InsertEndChild(TiXmlElement("offset"))->InsertEndChild(TiXmlText(str));
 		}
 		return pixels_size;
+	}
+
+	void Sky::Save(LPCTSTR path)
+	{
+		if (NULL == pixels_)
+			MakeDefault();
+		const size_t pixels_size(size_.cx * size_.cy);
+		fipImage img(FIT_BITMAP, static_cast<WORD>(size_.cx), static_cast<WORD>(size_.cy), 24);
+		BYTE *img_iter(img.accessPixels());
+		const COLORREF *pixels_iter(pixels_);
+		const COLORREF * const pixels_end(pixels_iter + pixels_size);
+		while (pixels_iter != pixels_end)
+		{
+			*img_iter++ = GetRValue(*pixels_iter);
+			*img_iter++ = GetGValue(*pixels_iter);
+			*img_iter++ = GetBValue(*pixels_iter);
+			++pixels_iter;
+		}
+		img.save(path);
 	}
 
 	void Sky::Unpack(TiXmlNode *node, BYTE *buffer)
@@ -1525,74 +1516,31 @@ namespace TaskCommon
 		return;
 	}
 
-	void Sky::MakeDefault()
-	{
-		_ASSERTE(NULL == pixels_);
-		const size_t pixels_size(size_.cx * size_.cy);
-		const size_t buffer_size (pixels_size * sizeof(COLORREF));
-		pixels_ = new COLORREF[pixels_size];
-		UncompressResource(IDR_SKY_TX, ri_cast<BYTE*>(pixels_), buffer_size);
-	}
-
-	void Sky::Save()
-	{
-		using namespace Loki;
-		SaveBegin();
-		LOKI_ON_BLOCK_EXIT_OBJ(*this, &Sky::SaveEnd);
-		SaveAs(info_.path_.c_str());
-	}
-
-	void Sky::SaveAs(LPCTSTR path)
-	{
-		if (NULL == pixels_)
-			MakeDefault();
-		const size_t pixels_size(size_.cx * size_.cy);
-		fipImage img(FIT_BITMAP, static_cast<WORD>(size_.cx), static_cast<WORD>(size_.cy), 24);
-		BYTE *img_iter(img.accessPixels());
-		const COLORREF *pixels_iter(pixels_);
-		const COLORREF * const pixels_end(pixels_iter + pixels_size);
-		while (pixels_iter != pixels_end)
-		{
-			*img_iter++ = GetRValue(*pixels_iter);
-			*img_iter++ = GetGValue(*pixels_iter);
-			*img_iter++ = GetBValue(*pixels_iter);
-			++pixels_iter;
-		}
-		img.save(path);
-	}
-
 	//-----------------------
 	// Surface implementation
 	//-----------------------
 
 	const SIZE Surface::size_ = { 0x100, 0x100 };
 
-	Surface::info_t::info_t()
-		:path_()
-	{}
-
-	Surface::Surface(const HWND &error_hwnd)
+	Surface::Surface(HWND &error_hwnd)
 		:ErrorHandler(error_hwnd)
-		,SaveCallback(RS_SURFACE)
-		,indices_(NULL)
+		,indices_    (NULL)
 	{}
 
 	Surface::~Surface()
 	{
-		if (NULL != indices_)
-			delete [] indices_;
-		indices_ = NULL;
+		delete [] indices_;
 	}
 
-	bool Surface::Load()
+	bool Surface::Load(LPCTSTR path)
 	{
 		fipImage image;
 		// load the image
-		image.load(info_.path_.c_str());
+		image.load(path);
 		if (FALSE == image.isValid())
 		{
 			Sleep(512);
-			image.load(info_.path_.c_str());
+			image.load(path);
 			if (FALSE == image.isValid())
 			{
 				MakeDefault();
@@ -1631,12 +1579,17 @@ namespace TaskCommon
 		return true;
 	}
 
-	void Surface::Unload()
+	void Surface::MakeDefault()
 	{
-		_ASSERTE(NULL != indices_);
-		//Save();
-		delete [] indices_;
-		indices_ = NULL;
+		_ASSERTE(NULL == indices_);
+		const size_t indices_size(size_.cx * size_.cy);
+		const size_t palette_size(0x100 * sizeof(COLORREF));
+		const size_t buffer_size (indices_size + palette_size);
+		vector<BYTE> buffer(buffer_size);
+		UncompressResource(IDR_SURFACE_TX, &buffer[0], buffer_size);
+		indices_ = new BYTE[indices_size];
+		CopyMemory(indices_, &buffer[0], indices_size);
+		CopyMemory(palette_, &buffer[indices_size], palette_size);
 	}
 
 	int Surface::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset) const
@@ -1654,6 +1607,18 @@ namespace TaskCommon
 			node.InsertEndChild(TiXmlElement("offset"))->InsertEndChild(TiXmlText(str));
 		}
 		return surface_size + palette_size;
+	}
+
+	void Surface::Save(LPCTSTR path)
+	{
+		if (NULL == indices_)
+			MakeDefault();
+		const size_t indices_size(size_.cx * size_.cy);
+		const size_t palette_size(0x100 * sizeof(COLORREF));
+		fipImage img(FIT_BITMAP, static_cast<WORD>(size_.cx), static_cast<WORD>(size_.cy), 8);
+		CopyMemory(img.accessPixels(), indices_, indices_size);
+		CopyMemory(img.getPalette(),   palette_, palette_size);
+		img.save(path);
 	}
 
 	void Surface::Unpack(TiXmlNode *node, BYTE *buffer)
@@ -1692,63 +1657,22 @@ namespace TaskCommon
 		return;
 	}
 
-	void Surface::MakeDefault()
-	{
-		_ASSERTE(NULL == indices_);
-		const size_t indices_size(size_.cx * size_.cy);
-		const size_t palette_size(0x100 * sizeof(COLORREF));
-		const size_t buffer_size (indices_size + palette_size);
-		vector<BYTE> buffer(buffer_size);
-		UncompressResource(IDR_SURFACE_TX, &buffer[0], buffer_size);
-		indices_ = new BYTE[indices_size];
-		CopyMemory(indices_, &buffer[0], indices_size);
-		CopyMemory(palette_, &buffer[indices_size], palette_size);
-	}
-
-	void Surface::Save()
-	{
-		using namespace Loki;
-		SaveBegin();
-		LOKI_ON_BLOCK_EXIT_OBJ(*this, &Surface::SaveEnd);
-		SaveAs(info_.path_.c_str());
-	}
-
-	void Surface::SaveAs(LPCTSTR path)
-	{
-		if (NULL == indices_)
-			MakeDefault();
-		const size_t indices_size(size_.cx * size_.cy);
-		const size_t palette_size(0x100 * sizeof(COLORREF));
-		fipImage img(FIT_BITMAP, static_cast<WORD>(size_.cx), static_cast<WORD>(size_.cy), 8);
-		CopyMemory(img.accessPixels(), indices_, indices_size);
-		CopyMemory(img.getPalette(),   palette_, palette_size);
-		img.save(path);
-	}
-
 	//-----------------------
 	// Texture implementation
 	//-----------------------
 
-	Texture::info_t::info_t()
-		:fast_quantization_(true)
-		,path_             ()
-		,size_             ()
-	{}
-
-	Texture::Texture(const HWND &error_hwnd)
+	Texture::Texture(SIZE size, HWND &error_hwnd)
 		:ErrorHandler(error_hwnd)
-		,SaveCallback(RS_TEXTURE)
-		,indices_(NULL)
+		,indices_    (NULL)
+		,size_       (size)
 	{}
 
 	Texture::~Texture()
 	{
-		if (NULL != indices_)
-			delete [] indices_;
-		indices_ = NULL;
+		delete [] indices_;
 	}
 
-	bool Texture::Load()
+	bool Texture::Load(LPCTSTR path, bool fast_quantization)
 	{
 		fipImage image;
 		// load the texture image
@@ -1758,7 +1682,7 @@ namespace TaskCommon
 			uint        try_num(0);
 			for (; try_num != try_count; ++try_num)
 			{
-				image.load(info_.path_.c_str());
+				image.load(path);
 				if (TRUE == image.isValid())
 					break;
 				else
@@ -1771,7 +1695,7 @@ namespace TaskCommon
 			}
 		}
 		// make sure the dimensions are correct
-		if (image.getWidth() != info_.size_.cx || image.getHeight() != info_.size_.cy)
+		if (image.getWidth() != size_.cx || image.getHeight() != size_.cy)
 		{
 			MacroDisplayError(_T("Texture dimensions do not correspond to project settings."));
 			return false;
@@ -1779,7 +1703,7 @@ namespace TaskCommon
 		// quantize the image if necessary
 		if (FIC_PALETTE != image.getColorType())
 		{
-			FREE_IMAGE_QUANTIZE mode(info_.fast_quantization_ ? FIQ_WUQUANT : FIQ_NNQUANT);
+			FREE_IMAGE_QUANTIZE mode(fast_quantization ? FIQ_WUQUANT : FIQ_NNQUANT);
 			if (FALSE == image.colorQuantize(mode))
 			{
 				MacroDisplayError(_T("Texture could not be quantized."));
@@ -1790,7 +1714,7 @@ namespace TaskCommon
 		if (FALSE == image.flipVertical())
 			MacroDisplayError(_T("Texture bitmap could not be flipped."));
 		// allocate new memory for the texture
-		const size_t indices_size(info_.size_.cx * info_.size_.cy);
+		const size_t indices_size(size_.cx * size_.cy);
 		_ASSERTE(NULL == indices_);
 		indices_ = new BYTE[indices_size];
 		// extract image data
@@ -1802,18 +1726,16 @@ namespace TaskCommon
 		return true;
 	}
 
-	void Texture::Unload()
+	void Texture::MakeDefault()
 	{
-		_ASSERTE(NULL != indices_);
-		//Save();
-		delete [] indices_;
-		indices_ = NULL;
+		ZeroMemory(indices_, size_.cx * size_.cy);
+		FillMemory(palette_, 0x100, 0xFF);
 	}
 
 	int Texture::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, const vector<bool> &mask) const
 	{
 		// pack the texture and the palette
-		const int texture_size(info_.size_.cx * info_.size_.cy);
+		const int texture_size(size_.cx * size_.cy);
 		const int palette_size(256 * sizeof(COLORREF));
 		for (int i(0); i != texture_size; ++i)
 			if (mask[i])
@@ -1836,7 +1758,7 @@ namespace TaskCommon
 	void Texture::Unpack(TiXmlNode *node, BYTE *buffer)
 	{
 		// allocate memory for the texture
-		const size_t indices_size(info_.size_.cx * info_.size_.cy);
+		const size_t indices_size(size_.cx * size_.cy);
 		const size_t palette_size(256 * sizeof(COLORREF));
 		_ASSERTE(NULL == indices_);
 		indices_ = new BYTE[indices_size];
@@ -1861,74 +1783,37 @@ namespace TaskCommon
 			palette_buffer = buffer + atoi(palette_offset_node->Value());
 		}
 		CopyMemory(palette_, palette_buffer, palette_size);
-		CopyMemory(indices_, texture_buffer, indices_size);
+		CopyMemory(indices_, texture_buffer, indices_size); // WARN: possible buffer overflow
 		return;
-	}
-
-	void Texture::MakeDefault()
-	{
-		ZeroMemory(indices_, info_.size_.cx * info_.size_.cy);
-		FillMemory(palette_, 0x100, 0xFF);
-	}
-
-	void Texture::Save()
-	{
-		using namespace Loki;
-		SaveBegin();
-		LOKI_ON_BLOCK_EXIT_OBJ(*this, &Texture::SaveEnd);
-		SaveAs(info_.path_.c_str());
-	}
-
-	void Texture::SaveAs(LPCTSTR path)
-	{
-		// initialize the texture image
-		fipImage image(
-			FIT_BITMAP,
-			static_cast<WORD>(info_.size_.cx),
-			static_cast<WORD>(info_.size_.cy),
-			8);
-		// fill the image
-		if (NULL != indices_)
-		{
-			CopyMemory(image.accessPixels(), indices_, info_.size_.cx * info_.size_.cy);
-			CopyMemory(image.getPalette(), palette_, 256 * 4); // ASSUME sizeof(COLORREF) == 4
-		}
-		else
-		{
-			ZeroMemory(image.accessPixels(), info_.size_.cx * info_.size_.cy);
-			FillMemory(image.getPalette(), 256 * 4, 0xFF);
-		}
-		// convert the image to 24 bits (for easier editing)
-		if (FALSE == image.convertTo24Bits())
-			MacroDisplayError(_T("Could not convert the texture to 24-bit."));
-		// save the image
-		if (FALSE == image.save(path, PNG_DEFAULT))
-			MacroDisplayError(_T("Texture could not be saved"));
 	}
 
 	//-------------------------
 	// ZeroLayer implementation
 	//-------------------------
 
-	ZeroLayer::info_t::info_t()
-		:path_()
-		,size_()
-	{}
-
-	ZeroLayer::ZeroLayer(const HWND &error_hwnd)
+	ZeroLayer::ZeroLayer(SIZE size, HWND &error_hwnd)
 		:ErrorHandler(error_hwnd)
-		,SaveCallback(RS_ZERO_LAYER)
+		,size_(size)
 	{}
 
-	bool ZeroLayer::Load()
+	void ZeroLayer::MakeDefault()
+	{
+		_ASSERTE(data_.empty());
+		const size_t data_size(size_.cx * size_.cy);
+		data_.resize(data_size);
+		for (size_t i(0); i != data_size; ++i)
+			data_[i] = true;
+	}
+
+	bool ZeroLayer::Load(LPCTSTR path)
 	{
 		fipImage image;
 		// load the image
-		image.load(info_.path_.c_str());
+		image.load(path);
 		if (FALSE == image.isValid())
 		{
 			Sleep(512);
-			image.load(info_.path_.c_str());
+			image.load(path);
 			if (FALSE == image.isValid())
 			{
 				MakeDefault();
@@ -1936,7 +1821,7 @@ namespace TaskCommon
 			}
 		}
 		// make sure that dimensions are correct
-		if (image.getWidth() != info_.size_.cx || image.getHeight() != info_.size_.cy)
+		if (image.getWidth() != size_.cx || image.getHeight() != size_.cy)
 		{
 			MacroDisplayError(_T("Hardness map dimensions do not correspond to project settings."));
 			return false;
@@ -1954,7 +1839,7 @@ namespace TaskCommon
 		if (FALSE == image.flipVertical())
 			MacroDisplayError(_T("Hardness map bitmap could not be flipped."));
 		// allocate memory
-		const size_t data_size(info_.size_.cx * info_.size_.cy);
+		const size_t data_size(size_.cx * size_.cy);
 		data_.resize(data_size);
 		// fill data_
 		{
@@ -1963,13 +1848,6 @@ namespace TaskCommon
 				data_[i] = *img_iter++ != 0;
 		}
 		return true;
-	}
-
-	void ZeroLayer::Unload()
-	{
-		//Save();
-		vector<bool> temp;
-		data_.swap(temp);
 	}
 
 	int ZeroLayer::Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset)
@@ -1995,6 +1873,25 @@ namespace TaskCommon
 		return byte_count;
 	}
 
+	void ZeroLayer::Save(LPCTSTR path)
+	{
+		_ASSERTE(!data_.empty());
+		// initialize the image
+		fipImage image(
+			FIT_BITMAP,
+			static_cast<WORD>(size_.cx),
+			static_cast<WORD>(size_.cy),
+			8);
+		// fill the image
+		BYTE *image_iter(image.accessPixels());
+		for (size_t i(0); i != data_.size(); ++i)
+			*image_iter++ = data_[i] ? 0xFF : 0x00;
+		image.threshold(1);
+		// save the image
+		if (FALSE == image.save(path, BMP_DEFAULT))
+			MacroDisplayError(_T("Hardness map could not be saved."));
+	}
+
 	void ZeroLayer::Unpack(TiXmlNode *node, BYTE *buffer)
 	{
 		if (NULL == node)
@@ -2018,7 +1915,7 @@ namespace TaskCommon
 		}
 		// unpack
 		{
-			const size_t data_size = info_.size_.cx * info_.size_.cy;
+			const size_t data_size = size_.cx * size_.cy;
 			_ASSERTE(data_size % 8 == 0);	
 			_ASSERTE(data_.empty());
 			data_.reserve(data_size);
@@ -2027,41 +1924,5 @@ namespace TaskCommon
 				for (int b(0); b != 8; ++b)
 					data_.push_back(0 != (*buffer_iter & 1 << b));
 		}
-	}
-
-	void ZeroLayer::MakeDefault()
-	{
-		_ASSERTE(data_.empty());
-		const size_t data_size(info_.size_.cx * info_.size_.cy);
-		data_.resize(data_size);
-		for (size_t i(0); i != data_size; ++i)
-			data_[i] = true;
-	}
-
-	void ZeroLayer::Save()
-	{
-		using namespace Loki;
-		SaveBegin();
-		LOKI_ON_BLOCK_EXIT_OBJ(*this, &ZeroLayer::SaveEnd);
-		SaveAs(info_.path_.c_str());
-	}
-
-	void ZeroLayer::SaveAs(LPCTSTR path)
-	{
-		_ASSERTE(!data_.empty());
-		// initialize the image
-		fipImage image(
-			FIT_BITMAP,
-			static_cast<WORD>(info_.size_.cx),
-			static_cast<WORD>(info_.size_.cy),
-			8);
-		// fill the image
-		BYTE *image_iter(image.accessPixels());
-		for (size_t i(0); i != data_.size(); ++i)
-			*image_iter++ = data_[i] ? 0xFF : 0x00;
-		image.threshold(1);
-		// save the image
-		if (FALSE == image.save(info_.path_.c_str(), BMP_DEFAULT))
-			MacroDisplayError(_T("Hardness map could not be saved."));
 	}
 }

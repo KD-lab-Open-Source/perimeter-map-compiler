@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -33,9 +33,6 @@
 
 #include "error handler.h"
 
-#include "resources/resource ids.h"
-#include "resources/save callback.h"
-
 namespace TaskCommon
 {
 	//--------------------
@@ -44,6 +41,8 @@ namespace TaskCommon
 
 	struct Hardness;
 	class  Heightmap;
+	class  Heightmap8;
+	class  Heightmap16;
 	struct Lightmap;
 	struct MapInfo;
 	struct ZeroLayer;
@@ -52,80 +51,83 @@ namespace TaskCommon
 	// 1-bit bitmap specifying the areas that are not accessible to terraforming
 	//--------------------------------------------------------------------------
 
-	struct Hardness : public ErrorHandler, public SaveCallback
+	struct Hardness : public ErrorHandler
 	{
-	public:
-		struct info_t
-		{
-			info_t();
-			tstring path_;
-			SIZE    size_;
-		};
-	public:
-		// construction
-		Hardness(const HWND &error_hwnd);
+		Hardness(SIZE size, HWND &error_hwnd);
 		~Hardness();
-		// TaskResource support
-		bool Load();
-		void Unload();
-		// packing
-		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, const vector<bool> &mask);
-		void Unpack(TiXmlNode *node, BYTE *buffer, const vector<bool> &mask);
-		// miscellaneous
+		bool Load(LPCTSTR path);
 		void MakeDefault();
-		void Save();
-		void SaveAs(LPCTSTR path);
-	public:
-		BYTE   *data_;
-		info_t info_;
+		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, const vector<bool> &mask);
+		void Save(LPCTSTR path);
+		void Unpack(TiXmlNode *node, BYTE *buffer, const vector<bool> &mask);
+		BYTE *data_;
+		WORD *data16_;
+		SIZE size_;
 	};
 
 	//---------------------------------------------------------------
 	// 8-bit or 16-bit grayscale bitmap defining the shape of the map
 	//---------------------------------------------------------------
 
-	class Heightmap : public ErrorHandler, public SaveCallback
+	class Heightmap : public ErrorHandler
 	{
 	public:
-		struct info_t
-		{
-			info_t();
-			tstring   path_;
-			SIZE      size_;
-			uint      zero_level_;
-			ZeroLayer *zero_layer_;
-		};
-	public:
-		// construction
-		Heightmap(const HWND &error_hwnd);
+		Heightmap(WORD bpp, ErrorHandler &error_handler);
 		virtual ~Heightmap();
-		// TaskResource support
-		bool Load();
-		void Unload();
-		// packing
+	public:
+		virtual void MakeDefault() = 0;
+		virtual int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask) = 0;
+	public:
+		WORD GetBpp() const;
+	private:
+		const WORD bpp_;
+	public:
+		SIZE  size_;
+	};
+
+	class Heightmap8 : public Heightmap
+	{
+	public:
+		Heightmap8(SIZE size, ErrorHandler &error_handler);
+		~Heightmap8();
+	public:
+		void MakeDefault();
+		bool Load(fipImage &image, const ZeroLayer *zero_layer, uint zero_level);
 		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask);
 		void Unpack(TiXmlNode *node, BYTE *buffer, vector<bool> &mask);
-		// miscellaneous
-		void MakeDefault();
-		void Save();
-		void SaveAs(LPCTSTR path);
-	private:
-		// bpp-specific
-		bool Load8 (fipImage &image);
-		bool Load16(fipImage &image);
-		void MakeDefault8 ();
-		void MakeDefault16();
-		int  Pack8 (TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask);
-		int  Pack16(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask);
-		void Unpack8 (TiXmlNode *node, BYTE *buffer, vector<bool> &mask);
-		void Unpack16(TiXmlNode *node, BYTE *buffer, vector<bool> &mask);
 	public:
-		int     bpp_;
-		BYTE   *data8_;
-		WORD   *data16_;
-		SIZE    size_;
-		info_t  info_;
+		BYTE *data_;
 	};
+
+	class Heightmap16 : public Heightmap
+	{
+	public:
+		Heightmap16(SIZE size, ErrorHandler &error_handler);
+		~Heightmap16();
+	public:
+		void MakeDefault();
+		bool Load(fipImage &image, const ZeroLayer *zero_layer, uint zero_level);
+		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, vector<bool> &mask);
+		void Unpack(TiXmlNode *node, BYTE *buffer, vector<bool> &mask);
+	public:
+		operator Heightmap8*();
+	public:
+		WORD *data_;
+	};
+
+	Heightmap* LoadHeightmap(
+		SIZE             size,
+		ErrorHandler    &error_handler,
+		LPCTSTR          path,
+		const ZeroLayer *zero_layer,
+		uint             zero_level);
+
+	Heightmap* UnpackHeightmap(
+		SIZE size,
+		ErrorHandler &error_handler,
+		TiXmlNode *node,
+		BYTE *buffer,
+		vector<bool> &mask);
 
 	//-------------------------------------------------------------
 	// 8-bit bitmap storing lightness of the map
@@ -135,12 +137,12 @@ namespace TaskCommon
 	struct Lightmap : public ErrorHandler
 	{
 	public:
-		Lightmap(const HWND &error_hwnd);
+		Lightmap(SIZE size, HWND &error_hwnd);
 		~Lightmap();
 		bool Create(const Heightmap &heightmap);
 	private:
-		bool Create8 (const Heightmap &heightmap);
-		bool Create16(const Heightmap &heightmap);
+		bool Create(const Heightmap8  &heightmap);
+		bool Create(const Heightmap16 &heightmap);
 	public:
 		BYTE *data_;
 		SIZE size_;
@@ -182,60 +184,30 @@ namespace TaskCommon
 	// custom mission script
 	//----------------------
 
-	struct Script : public ErrorHandler, public SaveCallback
+	struct Script : public ErrorHandler
 	{
-	public:
-		struct info_t
-		{
-			tstring path_;
-		};
-	public:
-		// construction
-		Script(const HWND &error_hwnd);
-		// TaskResource support
-		bool Load();
-		void Unload();
-		// packing
+		Script(HWND &error_hwnd);
+		bool Load(LPCTSTR path);
 		void Pack(TiXmlNode &node) const;
+		void Save(LPCTSTR path) const;
 		bool Unpack(TiXmlNode &node);
-		// miscellaneous
-		void Save() const;
-		void SaveAs(LPCTSTR path) const;
-	public:
 		TiXmlDocument doc_;
-		info_t        info_;
 	};
 
 	//---------------------------------
 	// custom 24-bit colour sky texture
 	//---------------------------------
 
-	struct Sky : public ErrorHandler, public SaveCallback
+	struct Sky : public ErrorHandler
 	{
-	public:
-		struct info_t
-		{
-			info_t();
-			tstring path_;
-		};
-	public:
-		// construction
-		Sky(const HWND &error_hwnd);
+		Sky(HWND &error_hwnd);
 		~Sky();
-		// TaskResource support
-		bool Load();
-		void Unload();
-		// packing
-		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset) const;
-		void Unpack(TiXmlNode *node, BYTE *buffer);
-		// miscellaneous
+		bool Load(LPCTSTR path);
 		void MakeDefault();
-		void Save();
-		void SaveAs(LPCTSTR path);
-	public:
+		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset) const;
+		void Save(LPCTSTR path);
+		void Unpack(TiXmlNode *node, BYTE *buffer);
 		COLORREF *pixels_;
-		info_t   info_;
-	public:
 		static const SIZE size_;
 	};
 
@@ -243,33 +215,17 @@ namespace TaskCommon
 	// custom paletted 8-bit surface texture
 	//--------------------------------------
 
-	struct Surface : public ErrorHandler, public SaveCallback
+	struct Surface : public ErrorHandler
 	{
-	public:
-		struct info_t
-		{
-			info_t();
-			tstring path_;
-		};
-	public:
-		// construction
-		Surface(const HWND &error_hwnd);
+		Surface(HWND &error_hwnd);
 		~Surface();
-		// TaskResource support
-		bool Load();
-		void Unload();
-		// packing
-		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset) const;
-		void Unpack(TiXmlNode *node, BYTE *buffer);
-		// miscellaneous
+		bool Load(LPCTSTR path);
 		void MakeDefault();
-		void Save();
-		void SaveAs(LPCTSTR path);
-	public:
+		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset) const;
+		void Save(LPCTSTR path);
+		void Unpack(TiXmlNode *node, BYTE *buffer);
 		BYTE     *indices_;
-		COLORREF palette_[0x100];
-		info_t   info_;
-	public:
+		COLORREF  palette_[0x100];
 		static const SIZE size_;
 	};
 
@@ -277,65 +233,33 @@ namespace TaskCommon
 	// paletted 8-bit texture defining colour of the map
 	//--------------------------------------------------
 
-	struct Texture : public ErrorHandler, public SaveCallback
+	struct Texture : public ErrorHandler
 	{
-	public:
-		struct info_t
-		{
-			info_t();
-			bool    fast_quantization_;
-			tstring path_;
-			SIZE    size_;
-		};
-	public:
-		// construction
-		Texture(const HWND &error_hwnd);
+		Texture(SIZE size, HWND &error_hwnd);
 		~Texture();
-		// TaskResource support
-		bool Load();
-		void Unload();
-		// packing
+		bool Load(LPCTSTR path, bool fast_quantization);
+		void MakeDefault();
 		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset, const vector<bool> &mask) const;
 		void Unpack(TiXmlNode *node, BYTE *buffer);
-		// miscellaneous
-		void MakeDefault();
-		void Save();
-		void SaveAs(LPCTSTR path);
-	public:
 		BYTE     *indices_;
-		COLORREF palette_[0x100];
-		info_t   info_;
+		COLORREF  palette_[0x100];
+		SIZE      size_;
 	};
 
 	//--------------------------------------------------------------------
 	// 1-bit bitmap defining the areas appearing terraformed at game start
 	//--------------------------------------------------------------------
 
-	struct ZeroLayer : public ErrorHandler, public SaveCallback
+	struct ZeroLayer : public ErrorHandler
 	{
-	public:
-		struct info_t
-		{
-			info_t();
-			tstring path_;
-			SIZE    size_;
-		};
-	public:
-		// construction
-		ZeroLayer(const HWND &error_hwnd);
-		// TaskResource support
-		bool Load();
-		void Unload();
-		// packing
-		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset);
-		void Unpack(TiXmlNode *node, BYTE *buffer);
-		// miscellaneous
+		ZeroLayer(SIZE size, HWND &error_hwnd);
+		bool Load(LPCTSTR path);
 		void MakeDefault();
-		void Save();
-		void SaveAs(LPCTSTR path);
-	public:
+		int  Pack(TiXmlNode &node, BYTE *buffer, const BYTE *initial_offset);
+		void Save(LPCTSTR path);
+		void Unpack(TiXmlNode *node, BYTE *buffer);
 		vector<bool> data_;
-		info_t       info_;
+		SIZE size_;
 	};
 
 	//-------------------------------------------------

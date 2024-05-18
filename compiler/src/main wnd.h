@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -104,20 +104,11 @@ public:
 public:
 	struct PanelInfo
 	{
-		PanelInfo(
-			PanelWindow *panel,
-			WORD image_id,
-			LPCTSTR tip,
-			RECT   &creation_rect)
-			:panel_        (panel)
-			,image_id_     (image_id)
-			,tip_          (tip)
-			,creation_rect_(creation_rect)
-		{}
+		PanelInfo(PanelWindow *panel, WORD image_id, LPCTSTR tip)
+			:panel_(panel), image_id_(image_id), tip_(tip) {}
 		PanelWindow *panel_;
 		WORD         image_id_;
 		LPCTSTR      tip_;
-		RECT         creation_rect_;
 	};
 private:
 	struct TasksLeft : ProjectManager::TasksLeft
@@ -127,22 +118,22 @@ private:
 	private:
 		HWND &hwnd_;
 	};
-	struct ToggleButton
+	struct TogglePanelVisibility : PanelWindow::ToggleVisibility
 	{
+		TogglePanelVisibility(HWND button);
+		~TogglePanelVisibility();
+		virtual void operator() (bool on);
 		HWND button_;
 	};
 	struct PanelData
 	{
-		PanelData();
-		void on();
-		void off();
+		PanelData() : button_hwnd_(NULL), image_(NULL) {}
 		HWND         button_hwnd_;
-		bool         created_;
-		RECT         creation_rect_;
 		HBITMAP      image_;
 		WORD         image_id_;
 		PanelWindow *panel_;
 		WORD         panel_id_;
+		TogglePanelVisibility *toggle_panel_visibility_;
 	};
 	enum MenuState
 	{
@@ -162,7 +153,6 @@ public:
 	void AddPanelWnds(PanelInfo (&panels)[panel_count]);
 	bool Create(POINT position);
 	void OpenProject(LPCTSTR path);
-	void ShowPanel(int panel_id, bool show);
 	void UnpackShrub(LPCTSTR path);
 // message handlers
 private:
@@ -197,20 +187,13 @@ protected:
 private:
 	static VOID CALLBACK ToolTipCleanupCallback(HWND hwnd, UINT msg_id, DWORD data, LRESULT result);
 private:
-	bool    AddPanelWnd(
-		PanelWindow *panel,
-		WORD         image_id,
-		WORD         panel_index,
-		RECT        &button_rect,
-		RECT        &creation_rect,
-		LPCTSTR      tip);
+	bool    AddPanelWnd(PanelWindow *panel, WORD image_id, WORD panel_index, RECT &button_rect, LPCTSTR tip);
 	void    AddToolTip(HWND hwnd, LPCTSTR text);
 	void    ChangeToolTipText(HWND hwnd, LPCTSTR text);
 	HBITMAP CreateButtonImage(WORD image_id);
 	tstring GetFilePathDlg(LPCTSTR title, LPCTSTR filter);
 	tstring GetFolderPathDlg(LPCTSTR title);
 	void    SetMenuState(MenuState state);
-	void    ShowPanel(PanelData &panel, bool show);
 	void    ToggleBusyIcon(bool busy, LPCTSTR message);
 	void    ToggleStateIcon(MenuState state);
 //data

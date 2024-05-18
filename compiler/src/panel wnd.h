@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -31,8 +31,6 @@
 
 #pragma once
 
-#include "event.h"
-
 #include "pmc wnd.h"
 
 class PanelHolderWindow;
@@ -45,20 +43,19 @@ class PanelWindow : public PMCWindow
 {
 // nested types
 public:
-	typedef event<void()> on_show_t;
-	typedef event<void()> on_hide_t;
+	// functor called by OnShowWindow
+	struct ToggleVisibility {
+		virtual void operator() (bool on) = 0;
+		virtual ~ToggleVisibility() {};
+	};
 // creation/destruction
 public:
 	PanelWindow();
 // interface
 public:
-	virtual bool Create(HWND parent_wnd, const RECT &window_rect) = 0;
-public:
 	bool IsVisible() const;
-// events
-public:
-	on_show_t on_show_;
-	on_hide_t on_hide_;
+	void SetVisibilityEvent(ToggleVisibility *visibility_event);
+	void SetVisibilityNotification(ToggleVisibility *visibility_notification);
 // message handlers
 protected:
 	void OnCommand   (Msg<WM_COMMAND>    &msg);
@@ -68,5 +65,7 @@ protected:
 	void ProcessMessage(WndMsg &msg);
 // data
 private:
+	ToggleVisibility *visibility_event_;
+	ToggleVisibility *visibility_notification_;
 	bool is_visible_;
 };

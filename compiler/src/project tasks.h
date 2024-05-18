@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -40,14 +40,11 @@
 #include "error handler.h"
 #include "preview wnd.h"
 #include "task common.h"
-#include "task resource.h"
-#include "task resource manager.h"
 
+#include <bitset>
 #include <d3d9.h>
 #include <d3dx9.h>
 #include <dxerr9.h>
-
-#include <list>
 
 class InfoWnd;
 class PreviewWnd;
@@ -73,6 +70,23 @@ enum ProjectState
 	PS_SHRUB
 };
 
+//--------------------------------------
+// resouce types that can be manipulated
+//--------------------------------------
+
+enum Resource
+{
+	RS_HARDNESS = 0,
+	RS_HEIGHTMAP,
+	RS_SCRIPT,
+	RS_SKY,
+	RS_SURFACE,
+	RS_TEXTURE,
+	RS_ZERO_LAYER,
+	resource_count
+};
+typedef std::bitset<resource_count> IdsType;
+
 //----------------------------------------------------
 // thread-safe task environment
 // synchronization is left up to the user of the tasks
@@ -81,42 +95,30 @@ enum ProjectState
 struct TaskData
 {
 public:
-	// interface
-	TaskData(TaskCommon::SaveCallback::SaveHandler *save_handler, const HWND &error_hwnd);
-	void SetResourceManagerEnabled(bool enable);
+	TaskData();
+	~TaskData();
 public:
-	// miscelleneous data
+	tstring             map_name_;
+	tstring             project_folder_;
+	SIZE                map_size_;
+	ProjectState        project_state_;
+	bool                fast_quantization_;
+	bool                enable_lighting_;
+	float               mesh_threshold_;
 	bool                display_hardness_;
 	bool                display_texture_;
 	bool                display_zero_layer_;
-	bool                enable_lighting_;
-	bool                fast_quantization_;
-	float               mesh_threshold_;
-	ProjectState        project_state_;
-	SIZE                map_size_;
-	TaskCommon::MapInfo map_info_;
 	tstring             file_names_[resource_count];
-	tstring             map_name_;
-	tstring             project_folder_;
-	// resources
-	TaskResource<TaskCommon::Hardness>  hardness_;
-	TaskResource<TaskCommon::Heightmap> heightmap_;
-	TaskResource<TaskCommon::Script>    script_;
-	TaskResource<TaskCommon::Sky>       sky_;
-	TaskResource<TaskCommon::Surface>   surface_;
-	TaskResource<TaskCommon::Texture>   texture_;
-	TaskResource<TaskCommon::ZeroLayer> zero_layer_;
-private:
-	// unmanaged resources
-	TaskCommon::Hardness  um_hardness_;
-	TaskCommon::Heightmap um_heightmap_;
-	TaskCommon::Script    um_script_;
-	TaskCommon::Sky       um_sky_;
-	TaskCommon::Surface   um_surface_;
-	TaskCommon::Texture   um_texture_;
-	TaskCommon::ZeroLayer um_zero_layer_;
-	// manager
-	TaskResourceManager manager_;
+	TaskCommon::MapInfo map_info_;
+	CRITICAL_SECTION    section_;
+	// cached resources
+	TaskCommon::Hardness  *hardness_;
+	TaskCommon::Heightmap *heightmap_;
+	TaskCommon::Script    *script_;
+	TaskCommon::Sky       *sky_;
+	TaskCommon::Surface   *surface_;
+	TaskCommon::Texture   *texture_;
+	TaskCommon::ZeroLayer *zero_layer_;
 };
 
 //---------------------
@@ -141,7 +143,7 @@ class Task
 public:
 	virtual ~Task() {}
 public:
-	virtual void operator() (TaskData &data) = 0;
+	virtual void operator() () = 0;
 public:
 	static TaskData task_data_;
 };
@@ -153,8 +155,19 @@ public:
 class CreateDefaultFilesTask : public Task, public ErrorHandler
 {
 public:
-	CreateDefaultFilesTask(const HWND &error_hwnd);
-	void operator() (TaskData &data);
+	CreateDefaultFilesTask(HWND &error_hwnd);
+	void operator() ();
+};
+
+//-----------------------
+// loads and caches files
+//-----------------------
+
+class CacheProjectDataTask : public Task, public ErrorHandler
+{
+public:
+	CacheProjectDataTask(HWND &error_hwnd);
+	void operator() ();
 };
 
 //----------------------------------------------
@@ -164,10 +177,12 @@ public:
 class ChangeProjectTask : public Task
 {
 public:
-	ChangeProjectTask(PreviewWnd &preview_wnd);
-	void operator() (TaskData &data);
+	ChangeProjectTask(InfoWnd &info_wnd, PreviewWnd &preview_wnd, bool read_only = false);
+	void operator() ();
 private:
+	InfoWnd    &info_wnd_;
 	PreviewWnd &preview_wnd_;
+	bool        read_only_;
 };
 
 //----------------------------------
@@ -177,10 +192,20 @@ private:
 class CreateResourceTask : public Task, public ErrorHandler
 {
 public:
-	CreateResourceTask(uint id, const HWND &error_hwnd);
-	void operator() (TaskData &data);
+	CreateResourceTask(uint id, HWND error_hwnd);
+	void operator() ();
 private:
 	uint id_;
+};
+
+//-------------------
+// frees cached files
+//-------------------
+
+class FreeProjectDataTask : public Task
+{
+public:
+	void operator() ();
 };
 
 //----------------------------------------
@@ -191,7 +216,7 @@ class ImportScriptTask : public Task
 {
 public:
 	ImportScriptTask(LPCTSTR script_path, LPCTSTR xml_path);
-	void operator() (TaskData &data);
+	void operator() ();
 private:
 	tstring script_;
 	tstring xml_;
@@ -205,40 +230,35 @@ class InstallMapTask : public Task, public ErrorHandler
 {
 // construction/destruction
 public:
-	InstallMapTask(
-		const HWND &hwnd,
-		LPCTSTR     install_path,
-		uint        version,
-		bool        custom_zero_layer,
-		bool        rename_to_unregistered);
+	InstallMapTask(HWND &hwnd, LPCTSTR install_path, uint version);
 // Task interface
 public:
-	void operator() (TaskData &data);
+	void operator() ();
 // internal functioni
 private:
-	void AppendBTDB(
-		LPCTSTR      path,
-		LPCTSTR      folder_name,
-		ProjectState project_state,
-		tstring      map_name);
+	void AppendBTDB(LPCTSTR path, LPCTSTR folder_name);
 	void AppendWorldsPrm(LPCTSTR path, LPCTSTR folder_name, uint version);
-	void SaveMission(
-		TaskCommon::MapInfo map_info,
-		LPCTSTR             path,
-		LPCTSTR             folder_name,
-		bool                survival);
-	void SaveMission2(
-		TaskCommon::MapInfo map_info,
-		LPCTSTR             path,
-		LPCTSTR             folder_name,
-		bool                survival);
+	void SaveMission (LPCTSTR path, LPCTSTR folder_name, bool survival);
+	void SaveMission2(LPCTSTR path, LPCTSTR folder_name, bool survival);
 // data
 private:
 	HWND          hwnd_;
 	const tstring install_path_;
 	const uint    version_;
-	const bool    custom_zero_layer_;
-	const bool    rename_to_unregistered_;
+};
+
+//------------
+// loads files
+//------------
+
+class LoadProjectDataTask : public Task, public ErrorHandler
+{
+public:
+	LoadProjectDataTask(const IdsType  &ids, HWND &error_hwnd);
+	LoadProjectDataTask(HWND &error_hwnd); // loads all data
+	void operator() ();
+private:
+	IdsType ids_;
 };
 
 //----------------------------------------
@@ -248,7 +268,7 @@ class NotifyProjectOpenTask : public Task
 {
 public:
 	NotifyProjectOpenTask(HWND main_hwnd);
-	void operator() (TaskData &data);
+	void operator() ();
 private:
 	HWND main_hwnd_;
 };
@@ -260,7 +280,7 @@ class NotifyResourceCreatedTask : public Task
 {
 public:
 	NotifyResourceCreatedTask(Resource id, HWND main_hwnd);
-	void operator() (TaskData &data);
+	void operator() ();
 private:
 	Resource id_;
 	HWND     main_hwnd_;
@@ -273,7 +293,7 @@ class NotifyProjectUnpackedTask : public Task
 {
 public:
 	NotifyProjectUnpackedTask(HWND main_hwnd);
-	void operator() (TaskData &data);
+	void operator() ();
 private:
 	HWND main_hwnd_;
 };
@@ -286,19 +306,17 @@ class PackShrubTask : public Task, public ErrorHandler
 {
 public:
 	PackShrubTask(
-		bool        custom_hardness,
-		bool        custom_sky,
-		bool        custom_surface,
-		bool        custom_zero_layer,
-		bool        use_registration,
-		const HWND &error_hwnd);
-	void operator() (TaskData &data);
+		bool custom_hardness,
+		bool custom_sky,
+		bool custom_surface,
+		bool custom_zero_layer,
+		HWND &error_hwnd);
+	void operator() ();
 private:
 	bool custom_hardness_;
 	bool custom_sky_;
 	bool custom_surface_;
 	bool custom_zero_layer_;
-	bool use_registration_;
 };
 
 //-----------------------------------
@@ -308,21 +326,8 @@ private:
 class SaveThumbTask : public Task, public ErrorHandler
 {
 public:
-	SaveThumbTask(const HWND &error_hwnd);
-	void operator() (TaskData &data);
-};
-
-//---------------------------------------
-// enable or disable the resource manager
-//---------------------------------------
-
-class SetResourceManagerEnabledTask : public Task
-{
-public:
-	SetResourceManagerEnabledTask(bool enable);
-	void operator() (TaskData &data);
-private:
-	bool enable_;
+	SaveThumbTask(HWND &error_hwnd);
+	void operator() ();
 };
 
 //--------------------------------------------
@@ -346,153 +351,54 @@ public:
 		bool         display_zero_layer,
 		tstring      file_names[resource_count],
 		const TaskCommon::MapInfo &map_info);
-	void operator() (TaskData &data);
+	void operator() ();
 private:
+	tstring      map_name_;
+	tstring      project_folder_;
+	SIZE         map_size_;
+	ProjectState project_state_;
+	bool         fast_quantization_;
+	bool         enable_lighting_;
+	float        mesh_threshold_;
 	bool         display_hardness_;
 	bool         display_texture_;
 	bool         display_zero_layer_;
-	bool         enable_lighting_;
-	bool         fast_quantization_;
-	float        mesh_threshold_;
-	ProjectState project_state_;
-	SIZE         map_size_;
-	TaskCommon::MapInfo map_info_;
 	tstring      file_names_[resource_count];
-	tstring      map_name_;
-	tstring      project_folder_;
+	TaskCommon::MapInfo map_info_;
 };
 
-//----------------------------------------------
-// an abstract base for the panel-updating tasks
-//----------------------------------------------
+//---------------------------------------
+// updates panels to reflect data changes
+//---------------------------------------
 
-class UpdatePanelTask : public Task, public ErrorHandler
+class UpdatePanelsTask : public Task, public ErrorHandler
 {
 // nested types
-protected:
-	typedef void (ProjectManager::*update_t)(IdsType ids);
-	typedef PanelWindow::on_show_t::connection_t connection_t;
-	typedef PanelWindow::on_show_t::delegate_t   delegate_t;
-protected:
-	// calls the project manager to update the corresponding window
-	struct OnPanelVisible
+private:
+	struct OnPanelVisible : PanelWindow::ToggleVisibility
 	{
-	public:
-		OnPanelVisible();
-		void Set(
-			IdsType         ids,
-			ProjectManager *project_manager,
-			update_t        updade,
-			connection_t    connection);
-		void operator() ();
+		OnPanelVisible(ProjectManager &project_manager);
+		void operator() (bool on);
 	private:
-		IdsType         ids_;
-		ProjectManager *project_manager_;
-		update_t        update_;
-		connection_t    connection_;
+		ProjectManager &project_manager_;
 	};
-// construction
+// construction/destruction
 public:
-	UpdatePanelTask(
-		IdsType         ids,
-		PanelWindow    &wnd,
-		ProjectManager &project_manager,
-		update_t        update,
-		const HWND     &error_hwnd);
-// Task interface
-public:
-	void operator() (TaskData &data);
-// interface
-protected:
-	virtual void UpdatePanel(
-		IdsType      ids,
-		PanelWindow &wnd,
-		TaskData    &data) = 0;
-	virtual OnPanelVisible &GetOnPanelVisible() = 0;
-// implementation
-private:
-	void Enqueue();
-// data
-private:
-	update_t        update_;
-	IdsType         ids_;
-	PanelWindow    &wnd_;
-	ProjectManager &project_manager_;
-};
-
-//------------------------------------------------
-// update the info panel to reflect data changes
-//------------------------------------------------
-
-class UpdateInfoWndTask : public UpdatePanelTask
-{
-// construction
-public:
-	UpdateInfoWndTask(
-		IdsType         ids,
+	UpdatePanelsTask(
 		InfoWnd        &info_wnd,
-		ProjectManager &project_manager,
-		const HWND     &error_hwnd);
-// implementation
-protected:
-	void UpdatePanel(
-		IdsType      ids,
-		PanelWindow &wnd,
-		TaskData    &data);
-	OnPanelVisible& GetOnPanelVisible();
-// data
-private:
-	static OnPanelVisible on_panel_visible_;
-};
-
-//-------------------------------------------------
-// update the preview panel to reflect data changes
-//-------------------------------------------------
-
-class UpdatePreviewWndTask : public UpdatePanelTask
-{
-// construction
-public:
-	UpdatePreviewWndTask(
-		IdsType         ids,
 		PreviewWnd     &preview_wnd,
-		ProjectManager &project_manager,
-		const HWND     &error_hwnd);
-// implementation
-protected:
-	void UpdatePanel(
-		IdsType      ids,
-		PanelWindow &wnd,
-		TaskData    &data);
-	OnPanelVisible& GetOnPanelVisible();
-// data
-private:
-	static OnPanelVisible on_panel_visible_;
-};
-
-//------------------------------------------------
-// update the status panel to reflect data changes
-//------------------------------------------------
-
-class UpdateStatWndTask : public UpdatePanelTask
-{
-// construction
-public:
-	UpdateStatWndTask(
-		IdsType         ids,
 		StatWnd        &stat_wnd,
 		ProjectManager &project_manager,
-		const HWND     &error_hwnd);
-// implementation
-protected:
-	void UpdatePanel(
-		IdsType      ids,
-		PanelWindow &wnd,
-		TaskData    &data);
-	OnPanelVisible& GetOnPanelVisible();
+		HWND           &error_hwnd);
+// Task interface
+public:
+	void operator() ();
 // data
 private:
-	static OnPanelVisible on_panel_visible_;
+	InfoWnd        &info_wnd_;
+	PreviewWnd     &preview_wnd_;
+	ProjectManager &project_manager_;
+	StatWnd        &stat_wnd_;
 };
 
 //----------------
@@ -501,20 +407,37 @@ private:
 
 class UnpackShrubTask : public Task, public ErrorHandler
 {
+// nested types
+private:
+	struct OnPanelVisible : PanelWindow::ToggleVisibility
+	{
+		OnPanelVisible(ProjectManager &project_manager);
+		void operator() (bool on);
+	private:
+		ProjectManager &project_manager_;
+	};
 // construction/destruction
 public:
 	UnpackShrubTask(
-		TiXmlDocument *document,
-		BYTE          *buffer,
-		BYTE          *initial_offset,
-		const HWND    &error_hwnd);
+		TiXmlDocument  *document,
+		BYTE           *buffer,
+		BYTE           *initial_offset,
+		InfoWnd        &info_wnd,
+		PreviewWnd     &preview_wnd,
+		StatWnd        &stat_wnd,
+		ProjectManager &project_manager,
+		HWND           &error_hwnd);
 	~UnpackShrubTask();
 // Task interface
 public:
-	void operator() (TaskData &data);
+	void operator() ();
 // data
 private:
 	TiXmlDocument  *document_;
 	BYTE           *buffer_;
+	InfoWnd        &info_wnd_;
 	BYTE           *initial_offset_;
+	PreviewWnd     &preview_wnd_;
+	ProjectManager &project_manager_;
+	StatWnd        &stat_wnd_;
 };

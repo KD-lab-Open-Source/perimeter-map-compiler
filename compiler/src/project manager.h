@@ -11,7 +11,7 @@
 // • Redistributions in binary form must reproduce the above copyright notice,
 //   this list of conditions and the following disclaimer in the documentation
 //   and/or other materials provided with the distribution. 
-// • Neither the name of Don Reba nor the names of his contributors may be used
+// • Neither the name of Don Reba nor the names of its contributors may be used
 //   to endorse or promote products derived from this software without specific
 //   prior written permission. 
 // 
@@ -37,10 +37,8 @@
 #include "preview wnd.h"
 #include "project tasks.h"
 #include "stat wnd.h"
-#include "task resources.h"
 
 #include <queue>
-#include <boost/array.hpp>
 
 class MainWnd;
 
@@ -50,7 +48,7 @@ class MainWnd;
 // the class is not thread-safe;
 //  it can only be used within the main thread
 //-------------------------------------------------------
-class ProjectManager : ErrorHandler, TaskCommon::SaveCallback::SaveHandler
+class ProjectManager : ErrorHandler
 {
 // callbacks
 public:
@@ -103,24 +101,16 @@ public:
 	void SaveThumbnail();
 	// data management
 	void CreateResource(Resource id, HWND main_hwnd);
+	void DisableResource(Resource id);
 	void ImportScript(LPCTSTR script_path, HWND main_hwnd);
-	// panel management
-	void UpdateInfoWnd   (IdsType ids);
-	void UpdatePreviewWnd(IdsType ids);
-	void UpdateStatWnd   (IdsType ids);
-	void UpdatePanels    (IdsType ids);
+	void ReloadFiles(const IdsType &ids);
 	// settings
 	void UpdateSettings();
 // internal function
 private:
-	static uint __stdcall ProcessorThreadProxy(void *obj);
+	static DWORD WINAPI ProcessorThread(LPVOID parameter);
 	void AddTask(Task *task);
 	void FindFileNames();
-	void ProcessorThread();
-	void ChangeOpeningCount(int delta);
-	// SaveHandler
-	void OnSaveBegin(Resource id);
-	void OnSaveEnd  (Resource id);
 // data
 private:
 	// threading
@@ -136,7 +126,6 @@ private:
 	tstring      folder_path_;
 	FileTracker  tracker_;
 	ProjectState project_state_;
-	int          opening_count_;
 	tstring file_names_[resource_count];
 // callback implementation instances
 private:
